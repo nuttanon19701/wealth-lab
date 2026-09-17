@@ -2,6 +2,7 @@ import {
   Calculator,
   Info,
   Landmark,
+  Layers,
   LineChart,
   PiggyBank,
   Receipt,
@@ -84,6 +85,14 @@ export const calculators: CalculatorMeta[] = [
     shortName: "กองทุนสำรองฯ",
     description: "ประมาณการเงินกองทุนสำรองเลี้ยงชีพเมื่อเกษียณอายุ",
     icon: ShieldCheck,
+  },
+  {
+    id: "bucket-strategy",
+    path: "/calculators/bucket-strategy",
+    name: "Retirement Bucket Strategy",
+    shortName: "4 Bucket",
+    description: "จำลองกลยุทธ์แบ่งเงินเกษียณเป็น 4 ถัง (Cash / Passive Income / Bond / Growth)",
+    icon: Layers,
   },
 ]
 

@@ -12,6 +12,7 @@ import {
 
 import { BigStat } from "@/components/calculator/BigStat"
 import { FieldGroup, NumberField, NumberWithFrequencyField } from "@/components/calculator/fields"
+import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
 import { MonthYearGrid } from "@/components/calculator/MonthYearGrid"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -197,6 +198,30 @@ export function DcaCalculator() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <InfoSection>
+        <InfoBlock heading="DCA คืออะไร">
+          <p>
+            Dollar-Cost Averaging (DCA) คือกลยุทธ์การลงทุนแบบทยอยลงทุนด้วยจำนวนเงินคงที่อย่างสม่ำเสมอ
+            แทนที่จะลงทุนเป็นก้อนใหญ่ครั้งเดียว ช่วยลดผลกระทบจากความผันผวนของราคาในระยะสั้น
+            เพราะบางเดือนซื้อได้ราคาแพง บางเดือนซื้อได้ราคาถูก เฉลี่ยแล้วต้นทุนจะไม่สุดโต่งไปด้านใดด้านหนึ่ง
+          </p>
+        </InfoBlock>
+        <InfoBlock heading="เครื่องมือนี้คำนวณอย่างไร">
+          <p>
+            ผลตอบแทนต่อปีที่ระบุจะถูกแปลงเป็นอัตราทบต้นรายเดือน แล้วจำลองการเติบโตของพอร์ตทุกเดือนตลอดระยะเวลาที่กำหนด
+            เงินลงทุนเพิ่มเติมจะถูกนำเข้าพอร์ตตามความถี่ที่เลือก (รายเดือน/รายปี)
+            และจำนวนเงินลงทุนเพิ่มเติมจะเติบโตขึ้นตามอัตราการเติบโตที่กำหนดในทุกรอบความถี่ที่เลือกไว้เช่นกัน
+          </p>
+        </InfoBlock>
+        <InfoBlock heading="ข้อควรระวัง">
+          <p>
+            ตัวเลขที่ได้เป็นเพียงการประมาณการจากอัตราผลตอบแทนคงที่ที่คุณกำหนดเอง
+            ผลตอบแทนจริงของการลงทุนมีความผันผวนและไม่สามารถรับประกันได้
+            ควรใช้ผลลัพธ์นี้เพื่อประกอบการวางแผนเบื้องต้นเท่านั้น ไม่ใช่คำแนะนำการลงทุน
+          </p>
+        </InfoBlock>
+      </InfoSection>
     </div>
   )
 }

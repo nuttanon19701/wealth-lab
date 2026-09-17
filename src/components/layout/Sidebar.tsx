@@ -67,11 +67,14 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
 function Logo() {
   return (
     <NavLink to="/" className="flex items-center gap-2 px-4 py-4">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
         <TrendingUp className="h-4.5 w-4.5" />
       </span>
-      <span className="text-lg font-bold tracking-tight text-sidebar-foreground">
-        Money<span className="text-primary">Sart</span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-lg font-bold tracking-tight text-sidebar-foreground">
+          Wealth<span className="text-primary">Lab</span>
+        </span>
+        <span className="text-[11px] text-muted-foreground">by นัทวางแผนการเงิน</span>
       </span>
     </NavLink>
   )

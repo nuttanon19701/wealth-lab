@@ -6,10 +6,12 @@ import { calculators } from "@/lib/calculators"
 import { About } from "@/pages/About"
 import { Home } from "@/pages/Home"
 import { ComingSoon } from "@/pages/ComingSoon"
+import { BucketStrategyCalculator } from "@/pages/calculators/BucketStrategyCalculator"
 import { DcaCalculator } from "@/pages/calculators/DcaCalculator"
 
 const calculatorPages: Record<string, ComponentType> = {
   dca: DcaCalculator,
+  "bucket-strategy": BucketStrategyCalculator,
 }
 
 function App() {
