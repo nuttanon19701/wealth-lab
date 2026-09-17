@@ -12,10 +12,13 @@ import {
 
 import { BigStat } from "@/components/calculator/BigStat"
 import { BucketFlowDiagram, BucketSurplusDiagram } from "@/components/calculator/BucketFlowDiagram"
+import { FanChart } from "@/components/calculator/FanChart"
 import { FieldGroup, NumberField } from "@/components/calculator/fields"
 import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
+import { MonteCarloToggle } from "@/components/calculator/MonteCarloToggle"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BUCKET_POLICY_DEFAULTS, calculateBucketStrategy, type BucketInputs } from "@/calculators/bucket"
+import { runBucketMonteCarlo } from "@/calculators/bucketMonteCarlo"
 import { formatBaht, formatPercent } from "@/lib/format"
 
 const defaultInputs: BucketInputs = {
@@ -26,6 +29,9 @@ const defaultInputs: BucketInputs = {
   spending: { monthlySpending: 30000, inflationPct: 3, years: 30 },
 }
 
+const defaultBondVolatilityPct = 6
+const defaultGrowthVolatilityPct = 18
+
 const bucketColors = {
   cash: "var(--chart-2)",
   bond: "var(--chart-3)",
@@ -34,8 +40,16 @@ const bucketColors = {
 
 export function BucketStrategyCalculator() {
   const [inputs, setInputs] = useState<BucketInputs>(defaultInputs)
+  const [monteCarloEnabled, setMonteCarloEnabled] = useState(false)
+  const [bondVolatilityPct, setBondVolatilityPct] = useState(defaultBondVolatilityPct)
+  const [growthVolatilityPct, setGrowthVolatilityPct] = useState(defaultGrowthVolatilityPct)
 
   const result = useMemo(() => calculateBucketStrategy(inputs), [inputs])
+
+  const mcResult = useMemo(() => {
+    if (!monteCarloEnabled) return null
+    return runBucketMonteCarlo({ ...inputs, bondVolatilityPct, growthVolatilityPct })
+  }, [monteCarloEnabled, inputs, bondVolatilityPct, growthVolatilityPct])
 
   const chartData = useMemo(() => {
     const first = {
@@ -183,6 +197,8 @@ export function BucketStrategyCalculator() {
         </CardContent>
       </Card>
 
+      <MonteCarloToggle enabled={monteCarloEnabled} onToggle={setMonteCarloEnabled} />
+
       <Card>
         <CardHeader>
           <CardTitle>สรุปเงินตั้งต้น</CardTitle>
@@ -290,6 +306,85 @@ export function BucketStrategyCalculator() {
         </CardContent>
       </Card>
 
+      {monteCarloEnabled && mcResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle>ผลการจำลอง Monte Carlo</CardTitle>
+            <CardDescription>
+              สุ่มผลตอบแทนรายปีของ Bond และ Growth 500 ครั้ง ตามค่าเฉลี่ยและความผันผวนที่กำหนด
+              (Safe และ Passive Income ยังคงใช้ค่าคงที่ตามที่ตั้งไว้ด้านบน)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            <FieldGroup>
+              <NumberField
+                label="ความผันผวนของ Bond (SD ต่อปี)"
+                value={bondVolatilityPct}
+                onChange={setBondVolatilityPct}
+                suffix="%"
+                min={0}
+              />
+              <NumberField
+                label="ความผันผวนของ Growth (SD ต่อปี)"
+                value={growthVolatilityPct}
+                onChange={setGrowthVolatilityPct}
+                suffix="%"
+                min={0}
+              />
+            </FieldGroup>
+
+            <BigStat
+              label="เงินคงเหลือรวมมัธยฐาน (Median) เมื่อสิ้นสุดการจำลอง"
+              value={`${formatBaht(mcResult.medianFinal)} บาท`}
+              sub={`ช่วงที่เป็นไปได้ (10th–90th percentile): ${formatBaht(mcResult.p10Final)} – ${formatBaht(mcResult.p90Final)} บาท`}
+            />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <BigStat
+                label="โอกาสที่ Bucket 3 (Bond) จะหมดภายในระยะเวลาจำลอง"
+                value={`${formatPercent(mcResult.bondDepletionProbability * 100)}%`}
+                sub={
+                  mcResult.medianBondDepletedYear
+                    ? `เมื่อหมด มักหมดราวปีที่ ${mcResult.medianBondDepletedYear} (มัธยฐาน)`
+                    : undefined
+                }
+                tone={mcResult.bondDepletionProbability > 0.2 ? "destructive" : "success"}
+              />
+              <BigStat
+                label="โอกาสที่ Bucket 4 (Growth) จะหมดภายในระยะเวลาจำลอง"
+                value={`${formatPercent(mcResult.growthDepletionProbability * 100)}%`}
+                sub={
+                  mcResult.medianGrowthDepletedYear
+                    ? `เมื่อหมด มักหมดราวปีที่ ${mcResult.medianGrowthDepletedYear} (มัธยฐาน)`
+                    : undefined
+                }
+                tone={mcResult.growthDepletionProbability > 0.2 ? "destructive" : "success"}
+              />
+            </div>
+
+            <div className="h-80 w-full">
+              <FanChart
+                data={mcResult.yearly}
+                xKey="year"
+                p10Key="p10"
+                p50Key="p50"
+                p90Key="p90"
+                p50Name="เงินคงเหลือรวม (มัธยฐาน)"
+                xTickFormatter={(v) => `ปี ${v}`}
+                yTickFormatter={(v) => formatBaht(v)}
+                tooltipFormatter={(v) => `${formatBaht(v)} บาท`}
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              พื้นที่แรเงาคือช่วงมูลค่าทรัพย์สินรวม (Cash + Bond + Growth) ตั้งแต่ 10th ถึง 90th percentile
+              จากการจำลอง 500 ครั้ง ซึ่งแต่ละครั้งใช้กลไกการเติมเงินและ Market Regime แบบเดียวกับด้านบน
+              เพียงแต่ผลตอบแทนรายปีของ Bond และ Growth ถูกสุ่มขึ้นใหม่ทุกครั้ง
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <InfoSection>
         <InfoBlock heading="แต่ละถังคืออะไร">
           <p>
@@ -338,8 +433,9 @@ export function BucketStrategyCalculator() {
 
         <InfoBlock heading="ข้อควรระวัง">
           <p>
-            เครื่องมือนี้จำลองด้วยอัตราผลตอบแทนคงที่ต่อปีตามที่คุณกำหนด ไม่ใช่การจำลองแบบ Monte Carlo
-            ผลลัพธ์ที่ได้เป็นเพียงภาพประกอบแนวคิดกลยุทธ์ 4 ถัง ไม่ใช่คำแนะนำการลงทุน
+            โหมดปกติ (ด้านบน) จำลองด้วยอัตราผลตอบแทนคงที่ต่อปีตามที่คุณกำหนด เหมาะสำหรับดูกลไกการเติมเงินแบบชัดเจน
+            ส่วนโหมด Monte Carlo จะช่วยให้เห็นความเสี่ยงจากความผันผวนของตลาดในแต่ละปี (Sequence of Returns Risk)
+            ได้สมจริงมากขึ้น ทั้งสองโหมดเป็นเพียงภาพประกอบแนวคิดกลยุทธ์ 4 ถัง ไม่ใช่คำแนะนำการลงทุน
             ผลตอบแทนจริงของสินทรัพย์แต่ละประเภทมีความผันผวนและไม่สามารถรับประกันได้
           </p>
         </InfoBlock>

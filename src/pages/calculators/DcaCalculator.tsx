@@ -11,12 +11,15 @@ import {
 } from "recharts"
 
 import { BigStat } from "@/components/calculator/BigStat"
+import { FanChart } from "@/components/calculator/FanChart"
 import { FieldGroup, NumberField, NumberWithFrequencyField } from "@/components/calculator/fields"
 import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
+import { MonteCarloToggle } from "@/components/calculator/MonteCarloToggle"
 import { MonthYearGrid } from "@/components/calculator/MonthYearGrid"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { calculateDca, type DcaInputs, type Frequency } from "@/calculators/dca"
+import { runDcaMonteCarlo } from "@/calculators/dcaMonteCarlo"
 import { formatBaht } from "@/lib/format"
 
 const defaultInputs: DcaInputs = {
@@ -29,10 +32,19 @@ const defaultInputs: DcaInputs = {
   additionalGrowthFrequency: "annually",
 }
 
+const defaultVolatilityPct = 15
+
 export function DcaCalculator() {
   const [inputs, setInputs] = useState<DcaInputs>(defaultInputs)
+  const [monteCarloEnabled, setMonteCarloEnabled] = useState(false)
+  const [volatilityPct, setVolatilityPct] = useState(defaultVolatilityPct)
 
   const result = useMemo(() => calculateDca(inputs), [inputs])
+
+  const mcResult = useMemo(() => {
+    if (!monteCarloEnabled) return null
+    return runDcaMonteCarlo({ ...inputs, volatilityPct })
+  }, [monteCarloEnabled, inputs, volatilityPct])
 
   const chartData = useMemo(() => {
     const points: { year: number; deposit: number; portfolio: number }[] = [
@@ -114,6 +126,8 @@ export function DcaCalculator() {
         </CardContent>
       </Card>
 
+      <MonteCarloToggle enabled={monteCarloEnabled} onToggle={setMonteCarloEnabled} />
+
       <BigStat
         label={`มูลค่าพอร์ตโดยประมาณเมื่อครบ ${inputs.years} ปี`}
         value={`${formatBaht(result.finalValue)} บาท`}
@@ -173,6 +187,53 @@ export function DcaCalculator() {
           </div>
         </CardContent>
       </Card>
+
+      {monteCarloEnabled && mcResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle>ผลการจำลอง Monte Carlo</CardTitle>
+            <CardDescription>สุ่มผลตอบแทนรายเดือน 500 ครั้ง จากค่าเฉลี่ยและความผันผวนที่กำหนด</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            <FieldGroup columns={1}>
+              <NumberField
+                label="ความผันผวนของผลตอบแทน (Volatility, SD ต่อปี)"
+                value={volatilityPct}
+                onChange={setVolatilityPct}
+                suffix="%"
+                min={0}
+                hint="ค่ายิ่งสูง แปลว่าผลตอบแทนแต่ละปีแกว่งมากขึ้น (หุ้นทั่วไปมักอยู่ราว 15-25%)"
+              />
+            </FieldGroup>
+
+            <BigStat
+              label="มูลค่าพอร์ตมัธยฐาน (Median) เมื่อครบกำหนด"
+              value={`${formatBaht(mcResult.medianFinal)} บาท`}
+              sub={`ช่วงที่เป็นไปได้ (10th–90th percentile): ${formatBaht(mcResult.p10Final)} – ${formatBaht(mcResult.p90Final)} บาท`}
+            />
+
+            <div className="h-80 w-full">
+              <FanChart
+                data={mcResult.yearly}
+                xKey="year"
+                p10Key="p10"
+                p50Key="p50"
+                p90Key="p90"
+                extraLine={{ key: "deposit", name: "เงินลงทุนสะสม", color: "var(--chart-2)" }}
+                xTickFormatter={(v) => `ปี ${v}`}
+                yTickFormatter={(v) => formatBaht(v)}
+                tooltipFormatter={(v) => `${formatBaht(v)} บาท`}
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              พื้นที่แรเงาคือช่วงผลลัพธ์ตั้งแต่ 10th ถึง 90th percentile จากการจำลอง 500 ครั้ง
+              เส้นหนาคือค่ามัธยฐาน (สถานการณ์กลาง) หมายความว่ามีโอกาสประมาณ 80%
+              ที่ผลลัพธ์จริงจะอยู่ในช่วงที่แรเงานี้
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
