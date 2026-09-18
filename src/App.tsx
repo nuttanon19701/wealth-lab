@@ -8,9 +8,23 @@ import { Home } from "@/pages/Home"
 import { ComingSoon } from "@/pages/ComingSoon"
 import { BucketStrategyCalculator } from "@/pages/calculators/BucketStrategyCalculator"
 import { DcaCalculator } from "@/pages/calculators/DcaCalculator"
+import { LoanAmortizedCalculator } from "@/pages/calculators/LoanAmortizedCalculator"
+import { LoanFlatCalculator } from "@/pages/calculators/LoanFlatCalculator"
+import { PvdCalculator } from "@/pages/calculators/PvdCalculator"
+import { RebalanceCalculator } from "@/pages/calculators/RebalanceCalculator"
+import { RetirementCalculator } from "@/pages/calculators/RetirementCalculator"
+import { TaxCalculator } from "@/pages/calculators/TaxCalculator"
+import { TvmCalculator } from "@/pages/calculators/TvmCalculator"
 
 const calculatorPages: Record<string, ComponentType> = {
   dca: DcaCalculator,
+  rebalance: RebalanceCalculator,
+  retirement: RetirementCalculator,
+  "loan-amortized": LoanAmortizedCalculator,
+  "loan-flat": LoanFlatCalculator,
+  tvm: TvmCalculator,
+  tax: TaxCalculator,
+  pvd: PvdCalculator,
   "bucket-strategy": BucketStrategyCalculator,
 }
 

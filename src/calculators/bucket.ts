@@ -40,6 +40,8 @@ export interface BucketYearRow {
   sweepBondToGrowth: number
   topUpBondFromGrowth: number
   unmetShortfall: number
+  emergencyWithdrawal: number
+  insolvent: boolean
 }
 
 export interface BucketResult {
@@ -52,6 +54,7 @@ export interface BucketResult {
   }
   bondDepletedYear: number | null
   growthDepletedYear: number | null
+  insolventYear: number | null
 }
 
 // Default policy assumptions (documented for the reader in the UI):
@@ -80,6 +83,7 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
   const rows: BucketYearRow[] = []
   let bondDepletedYear: number | null = null
   let growthDepletedYear: number | null = null
+  let insolventYear: number | null = null
 
   const totalYears = Math.max(0, Math.round(spending.years))
 
@@ -102,6 +106,7 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
     let sweepBondToGrowth = 0
     let topUpBondFromGrowth = 0
     let unmetShortfall = 0
+    let emergencyWithdrawal = 0
 
     const reserveTarget = spendingThisYear * RESERVE_YEARS
 
@@ -109,6 +114,8 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
       let shortfall = reserveTarget - cash
       const order: Array<"bond" | "growth"> = regime === "good" ? ["growth", "bond"] : ["bond", "growth"]
 
+      // Phase 1: normal, capped refill toward the reserve target (protects buckets
+      // from over-withdrawal under ordinary conditions).
       for (const source of order) {
         if (shortfall <= 0) break
         if (source === "growth") {
@@ -133,6 +140,35 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
       }
 
       unmetShortfall = Math.max(shortfall, 0)
+
+      // Phase 2: survival override. If the capped refill still leaves this year's
+      // spending uncovered (cash below zero, not just below the reserve target),
+      // pull whatever is still needed beyond the cap — spending must be met first.
+      if (cash < 0) {
+        let emergencyNeed = -cash
+        for (const source of order) {
+          if (emergencyNeed <= 0) break
+          if (source === "growth") {
+            const transfer = Math.min(emergencyNeed, growthBalance)
+            if (transfer > 0) {
+              growthBalance -= transfer
+              cash += transfer
+              emergencyNeed -= transfer
+              refillFromGrowth += transfer
+              emergencyWithdrawal += transfer
+            }
+          } else {
+            const transfer = Math.min(emergencyNeed, bondBalance)
+            if (transfer > 0) {
+              bondBalance -= transfer
+              cash += transfer
+              emergencyNeed -= transfer
+              refillFromBond += transfer
+              emergencyWithdrawal += transfer
+            }
+          }
+        }
+      }
     } else if (regime === "good") {
       if (bondBalance > bondTarget * (1 + BOND_TOLERANCE)) {
         sweepBondToGrowth = bondBalance - bondTarget
@@ -153,6 +189,11 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
       growthBalance = 0
       if (growthDepletedYear === null) growthDepletedYear = year
     }
+
+    // True insolvency: even the uncapped emergency withdrawal (Phase 2) couldn't
+    // cover this year's spending because both buckets are fully drained.
+    const insolvent = cash < 0
+    if (insolvent && insolventYear === null) insolventYear = year
     if (cash < 0) cash = 0
 
     rows.push({
@@ -169,6 +210,8 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
       sweepBondToGrowth,
       topUpBondFromGrowth,
       unmetShortfall,
+      emergencyWithdrawal,
+      insolvent,
     })
   }
 
@@ -178,6 +221,7 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
     startingProportions,
     bondDepletedYear,
     growthDepletedYear,
+    insolventYear,
   }
 }
 

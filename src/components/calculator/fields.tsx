@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import { Input } from "@/components/ui/input"
+import { FormattedNumberInput } from "@/components/calculator/FormattedNumberInput"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Frequency } from "@/calculators/dca"
@@ -12,25 +12,15 @@ interface NumberFieldProps {
   suffix?: string
   min?: number
   max?: number
-  step?: number
   hint?: string
 }
 
-export function NumberField({ label, value, onChange, suffix, min, max, step, hint }: NumberFieldProps) {
+export function NumberField({ label, value, onChange, suffix, hint }: NumberFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label>{label}</Label>
       <div className="relative">
-        <Input
-          type="number"
-          inputMode="decimal"
-          value={Number.isFinite(value) ? value : 0}
-          min={min}
-          max={max}
-          step={step ?? "any"}
-          onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
-          className={suffix ? "pr-14" : undefined}
-        />
+        <FormattedNumberInput value={value} onChange={onChange} className={suffix ? "pr-14" : undefined} />
         {suffix && (
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
             {suffix}
@@ -64,13 +54,7 @@ export function NumberWithFrequencyField({
       <Label>{label}</Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Input
-            type="number"
-            inputMode="decimal"
-            value={Number.isFinite(value) ? value : 0}
-            onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
-            className="pr-12"
-          />
+          <FormattedNumberInput value={value} onChange={onChange} className="pr-12" />
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
             {suffix}
           </span>
@@ -85,6 +69,77 @@ export function NumberWithFrequencyField({
           </SelectContent>
         </Select>
       </div>
+    </div>
+  )
+}
+
+interface SelectOption<T extends string> {
+  value: T
+  label: string
+}
+
+interface NumberWithOptionsFieldProps<T extends string> {
+  label: string
+  value: number
+  onChange: (value: number) => void
+  optionValue: T
+  onOptionChange: (value: T) => void
+  options: SelectOption<T>[]
+  suffix?: string
+  optionWidthClassName?: string
+}
+
+export function NumberWithOptionsField<T extends string>({
+  label,
+  value,
+  onChange,
+  optionValue,
+  onOptionChange,
+  options,
+  suffix = "%",
+  optionWidthClassName = "w-32",
+}: NumberWithOptionsFieldProps<T>) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <FormattedNumberInput value={value} onChange={onChange} className="pr-10" />
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+            {suffix}
+          </span>
+        </div>
+        <Select value={optionValue} onValueChange={(v) => onOptionChange(v as T)}>
+          <SelectTrigger className={`${optionWidthClassName} shrink-0`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  )
+}
+
+interface ReadonlyFieldProps {
+  label: string
+  value: string
+  hint?: string
+}
+
+export function ReadonlyField({ label, value, hint }: ReadonlyFieldProps) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label className="text-muted-foreground">{label}</Label>
+      <div className="flex h-9 items-center rounded-md border border-dashed border-border bg-muted/40 px-3 text-sm font-semibold text-foreground">
+        {value}
+      </div>
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
 }

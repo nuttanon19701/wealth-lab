@@ -26,6 +26,8 @@ export interface BucketMonteCarloResult {
   growthDepletionProbability: number
   medianBondDepletedYear: number | null
   medianGrowthDepletedYear: number | null
+  insolvencyProbability: number
+  medianInsolventYear: number | null
 }
 
 const { reserveYears: RESERVE_YEARS, drawdownBadThreshold: DRAWDOWN_BAD_THRESHOLD, bondTolerance: BOND_TOLERANCE } =
@@ -43,8 +45,10 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
   const finalValues: number[] = []
   const bondDepletedYears: number[] = []
   const growthDepletedYears: number[] = []
+  const insolventYears: number[] = []
   let bondDepletedCount = 0
   let growthDepletedCount = 0
+  let insolventCount = 0
 
   for (let sim = 0; sim < simulations; sim++) {
     let cash = safe.pv
@@ -53,6 +57,7 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
     let growthPeak = growth.pv
     let bondDepletedYear: number | null = null
     let growthDepletedYear: number | null = null
+    let insolventYear: number | null = null
 
     for (let year = 1; year <= totalYears; year++) {
       const spendingThisYear = spending.monthlySpending * 12 * Math.pow(1 + spending.inflationPct / 100, year - 1)
@@ -99,6 +104,29 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
             }
           }
         }
+
+        // Survival override: spending must be covered even beyond the redemption cap.
+        if (cash < 0) {
+          let emergencyNeed = -cash
+          for (const source of order) {
+            if (emergencyNeed <= 0) break
+            if (source === "growth") {
+              const transfer = Math.min(emergencyNeed, growthBalance)
+              if (transfer > 0) {
+                growthBalance -= transfer
+                cash += transfer
+                emergencyNeed -= transfer
+              }
+            } else {
+              const transfer = Math.min(emergencyNeed, bondBalance)
+              if (transfer > 0) {
+                bondBalance -= transfer
+                cash += transfer
+                emergencyNeed -= transfer
+              }
+            }
+          }
+        }
       } else if (regime === "good") {
         if (bondBalance > bondTarget * (1 + BOND_TOLERANCE)) {
           const sweep = bondBalance - bondTarget
@@ -119,6 +147,8 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
         growthBalance = 0
         if (growthDepletedYear === null) growthDepletedYear = year
       }
+
+      if (cash < 0 && insolventYear === null) insolventYear = year
       if (cash < 0) cash = 0
 
       wealthByYear[year - 1].push(cash + bondBalance + growthBalance)
@@ -132,6 +162,10 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
     if (growthDepletedYear !== null) {
       growthDepletedCount++
       growthDepletedYears.push(growthDepletedYear)
+    }
+    if (insolventYear !== null) {
+      insolventCount++
+      insolventYears.push(insolventYear)
     }
   }
 
@@ -148,6 +182,7 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
   const sortedFinal = [...finalValues].sort((a, b) => a - b)
   const sortedBondDepleted = [...bondDepletedYears].sort((a, b) => a - b)
   const sortedGrowthDepleted = [...growthDepletedYears].sort((a, b) => a - b)
+  const sortedInsolvent = [...insolventYears].sort((a, b) => a - b)
 
   return {
     yearly,
@@ -159,5 +194,7 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
     growthDepletionProbability: simulations > 0 ? growthDepletedCount / simulations : 0,
     medianBondDepletedYear: sortedBondDepleted.length > 0 ? percentile(sortedBondDepleted, 0.5) : null,
     medianGrowthDepletedYear: sortedGrowthDepleted.length > 0 ? percentile(sortedGrowthDepleted, 0.5) : null,
+    insolvencyProbability: simulations > 0 ? insolventCount / simulations : 0,
+    medianInsolventYear: sortedInsolvent.length > 0 ? percentile(sortedInsolvent, 0.5) : null,
   }
 }

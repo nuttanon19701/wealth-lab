@@ -233,7 +233,7 @@ export function BucketStrategyCalculator() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <BigStat
           label="Bucket 3 (Bond) หมดในปีที่"
           value={result.bondDepletedYear ? `ปีที่ ${result.bondDepletedYear}` : "ไม่หมด"}
@@ -243,6 +243,12 @@ export function BucketStrategyCalculator() {
           label="Bucket 4 (Growth) หมดในปีที่"
           value={result.growthDepletedYear ? `ปีที่ ${result.growthDepletedYear}` : "ไม่หมด"}
           tone={result.growthDepletedYear ? "destructive" : "success"}
+        />
+        <BigStat
+          label="เงินไม่พอใช้จ่ายจริงในปีที่"
+          value={result.insolventYear ? `ปีที่ ${result.insolventYear}` : "ไม่เกิดขึ้น"}
+          sub={result.insolventYear ? "ทั้ง Bond และ Growth หมดแล้ว ไม่เหลือเงินให้ดึงมาใช้จ่ายอีก" : undefined}
+          tone={result.insolventYear ? "destructive" : "success"}
         />
       </div>
 
@@ -339,7 +345,7 @@ export function BucketStrategyCalculator() {
               sub={`ช่วงที่เป็นไปได้ (10th–90th percentile): ${formatBaht(mcResult.p10Final)} – ${formatBaht(mcResult.p90Final)} บาท`}
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <BigStat
                 label="โอกาสที่ Bucket 3 (Bond) จะหมดภายในระยะเวลาจำลอง"
                 value={`${formatPercent(mcResult.bondDepletionProbability * 100)}%`}
@@ -359,6 +365,16 @@ export function BucketStrategyCalculator() {
                     : undefined
                 }
                 tone={mcResult.growthDepletionProbability > 0.2 ? "destructive" : "success"}
+              />
+              <BigStat
+                label="โอกาสที่เงินไม่พอใช้จ่ายจริง (Insolvency)"
+                value={`${formatPercent(mcResult.insolvencyProbability * 100)}%`}
+                sub={
+                  mcResult.medianInsolventYear
+                    ? `เมื่อเกิด มักเกิดราวปีที่ ${mcResult.medianInsolventYear} (มัธยฐาน)`
+                    : undefined
+                }
+                tone={mcResult.insolvencyProbability > 0.05 ? "destructive" : "success"}
               />
             </div>
 
@@ -428,6 +444,13 @@ export function BucketStrategyCalculator() {
             ทุกการดึงเงินจากถัง Bond หรือ Growth เข้าสู่ Bucket 1 จะถูกจำกัดด้วย &ldquo;เพดานการไถ่ถอนเข้า B1
             (%/ปี)&rdquo; ที่กำหนดไว้ เพื่อไม่ให้ดึงเงินออกจากถังใดถังหนึ่งมากเกินไปในปีเดียว
             และเปิดโอกาสให้ถัง Growth มีเวลาฟื้นตัวหลังช่วงตลาดตก
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">ข้อยกเว้นเพื่อความอยู่รอด:</span> เพดานนี้ใช้เฉพาะการเติมเงินเข้าสู่
+            &ldquo;เงินสำรอง 1 ปี&rdquo; ตามปกติเท่านั้น หากถึงขั้นที่เงินสดไม่พอสำหรับรายจ่ายจริงในปีนั้น (ไม่ใช่แค่ต่ำกว่าเป้าเงินสำรอง)
+            ระบบจะดึงเงินเพิ่มจากถัง Bond/Growth ตามลำดับความสำคัญเดิม โดยไม่ยึดติดกับเพดานอีกต่อไป
+            เพราะการมีเงินพอใช้จ่ายในแต่ละปีสำคัญกว่าการรักษาเพดานการถอน จะถือว่า &ldquo;เงินไม่พอใช้จ่ายจริง&rdquo;
+            ก็ต่อเมื่อทั้ง Bond และ Growth หมดแล้วเท่านั้น
           </p>
         </InfoBlock>
 
