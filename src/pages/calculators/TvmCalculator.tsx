@@ -15,6 +15,7 @@ import {
   type TvmSettings,
   type TvmValues,
 } from "@/calculators/tvm"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { cn } from "@/lib/utils"
 
 const defaultValues: TvmValues = {
@@ -108,8 +109,8 @@ function TvmRow({ label, hint, value, onChange, onSolve, solved, suffix }: TvmRo
 }
 
 export function TvmCalculator() {
-  const [values, setValues] = useState<TvmValues>(defaultValues)
-  const [settings, setSettings] = useState<TvmSettings>(defaultSettings)
+  const [values, setValues] = useCalculatorState<TvmValues>("tvm-values", defaultValues)
+  const [settings, setSettings] = useCalculatorState<TvmSettings>("tvm-settings", defaultSettings)
   const [solvedField, setSolvedField] = useState<TvmField | null>(null)
   const [error, setError] = useState<string | null>(null)
 

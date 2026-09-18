@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 
 import { AmortizationTable } from "@/components/calculator/AmortizationTable"
 import { BigStat } from "@/components/calculator/BigStat"
@@ -6,6 +6,7 @@ import { FieldGroup, NumberField, ReadonlyField } from "@/components/calculator/
 import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { calculateFlatLoan, type FlatLoanInputs } from "@/calculators/loanFlat"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { formatBaht } from "@/lib/format"
 
 const defaultInputs: FlatLoanInputs = {
@@ -15,7 +16,7 @@ const defaultInputs: FlatLoanInputs = {
 }
 
 export function LoanFlatCalculator() {
-  const [inputs, setInputs] = useState<FlatLoanInputs>(defaultInputs)
+  const [inputs, setInputs] = useCalculatorState<FlatLoanInputs>("loan-flat-inputs", defaultInputs)
 
   const result = useMemo(() => calculateFlatLoan(inputs), [inputs])
 

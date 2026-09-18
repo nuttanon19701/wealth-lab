@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import {
   Area,
   AreaChart,
@@ -11,63 +11,70 @@ import {
 } from "recharts"
 
 import { BigStat } from "@/components/calculator/BigStat"
-import { BucketFlowDiagram, BucketSurplusDiagram } from "@/components/calculator/BucketFlowDiagram"
+import { BucketMaintenanceDiagram, BucketWaterfallDiagram } from "@/components/calculator/BucketFlowDiagram"
 import { FanChart } from "@/components/calculator/FanChart"
 import { FieldGroup, NumberField } from "@/components/calculator/fields"
 import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
 import { MonteCarloToggle } from "@/components/calculator/MonteCarloToggle"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BUCKET_POLICY_DEFAULTS, calculateBucketStrategy, type BucketInputs } from "@/calculators/bucket"
+import { calculateBucketStrategy, type BucketInputs } from "@/calculators/bucket"
 import { runBucketMonteCarlo } from "@/calculators/bucketMonteCarlo"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { formatBaht, formatBahtCompact, formatPercent } from "@/lib/format"
 
 const defaultInputs: BucketInputs = {
   safe: { pv: 300000, returnPct: 1.5 },
   passive: { annualIncome: 60000, taxPct: 10 },
-  bond: { pv: 1500000, returnPct: 3, redemptionToB1Pct: 20 },
-  growth: { pv: 2200000, returnPct: 7, redemptionToB1Pct: 15 },
+  lowRisk: { pv: 1500000, returnPct: 3 },
+  highRisk: { pv: 2200000, returnPct: 7, redemptionToB2Pct: 15 },
   spending: { monthlySpending: 30000, inflationPct: 3, years: 30 },
 }
 
-const defaultBondVolatilityPct = 6
-const defaultGrowthVolatilityPct = 18
+const defaultLowRiskVolatilityPct = 6
+const defaultHighRiskVolatilityPct = 18
 
 const bucketColors = {
-  cash: "var(--chart-2)",
-  bond: "var(--chart-3)",
-  growth: "var(--chart-1)",
+  safe: "var(--chart-2)",
+  lowRisk: "var(--chart-3)",
+  highRisk: "var(--chart-1)",
 }
 
 export function BucketStrategyCalculator() {
-  const [inputs, setInputs] = useState<BucketInputs>(defaultInputs)
-  const [monteCarloEnabled, setMonteCarloEnabled] = useState(false)
-  const [bondVolatilityPct, setBondVolatilityPct] = useState(defaultBondVolatilityPct)
-  const [growthVolatilityPct, setGrowthVolatilityPct] = useState(defaultGrowthVolatilityPct)
+  const [inputs, setInputs] = useCalculatorState<BucketInputs>("bucket-inputs", defaultInputs)
+  const [monteCarloEnabled, setMonteCarloEnabled] = useCalculatorState("bucket-mc-enabled", false)
+  const [lowRiskVolatilityPct, setLowRiskVolatilityPct] = useCalculatorState(
+    "bucket-mc-lowrisk-vol",
+    defaultLowRiskVolatilityPct,
+  )
+  const [highRiskVolatilityPct, setHighRiskVolatilityPct] = useCalculatorState(
+    "bucket-mc-highrisk-vol",
+    defaultHighRiskVolatilityPct,
+  )
 
   const result = useMemo(() => calculateBucketStrategy(inputs), [inputs])
 
   const mcResult = useMemo(() => {
     if (!monteCarloEnabled) return null
-    return runBucketMonteCarlo({ ...inputs, bondVolatilityPct, growthVolatilityPct })
-  }, [monteCarloEnabled, inputs, bondVolatilityPct, growthVolatilityPct])
+    return runBucketMonteCarlo({ ...inputs, lowRiskVolatilityPct, highRiskVolatilityPct })
+  }, [monteCarloEnabled, inputs, lowRiskVolatilityPct, highRiskVolatilityPct])
 
   const chartData = useMemo(() => {
     const first = {
       year: 0,
-      cash: inputs.safe.pv,
-      bond: inputs.bond.pv,
-      growth: inputs.growth.pv,
+      safe: inputs.safe.pv,
+      lowRisk: inputs.lowRisk.pv,
+      highRisk: inputs.highRisk.pv,
     }
     return [
       first,
       ...result.rows.map((r) => ({
         year: r.year,
-        cash: Math.round(r.cash),
-        bond: Math.round(r.bond),
-        growth: Math.round(r.growth),
+        safe: Math.round(r.safe),
+        lowRisk: Math.round(r.lowRisk),
+        highRisk: Math.round(r.highRisk),
       })),
     ]
-  }, [result.rows, inputs.safe.pv, inputs.bond.pv, inputs.growth.pv])
+  }, [result.rows, inputs.safe.pv, inputs.lowRisk.pv, inputs.highRisk.pv])
 
   function update<K extends keyof BucketInputs>(key: K, value: BucketInputs[K]) {
     setInputs((prev) => ({ ...prev, [key]: value }))
@@ -78,11 +85,9 @@ export function BucketStrategyCalculator() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-          Retirement Bucket Strategy — 4 Bucket Simulator
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">3 Bucket Strategies</h1>
         <p className="text-muted-foreground">
-          จำลองการแบ่งเงินเกษียณเป็น 4 ถัง และดูว่าแต่ละถังจะเคลื่อนไหวอย่างไรตามกลไกการเติมเงินแบบมีกฎเกณฑ์
+          จำลองการแบ่งเงินเกษียณเป็น 3 ถัง บวก Passive Income และดูว่าแต่ละถังจะเคลื่อนไหวอย่างไรตามกลไกการใช้จ่ายและรักษาสมดุล
         </p>
       </div>
 
@@ -92,7 +97,7 @@ export function BucketStrategyCalculator() {
           <CardDescription>กำหนดมูลค่าตั้งต้นและสมมติฐานผลตอบแทนของแต่ละถัง</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          <FieldGroup title="a. Safe / Steady (Bucket 1 — เงินสำรองใช้จ่าย)">
+          <FieldGroup title="Safe / Steady (Bucket 1 — เงินสำรองใช้จ่าย)">
             <NumberField
               label="มูลค่าปัจจุบัน (Present Value)"
               value={inputs.safe.pv}
@@ -108,7 +113,7 @@ export function BucketStrategyCalculator() {
             />
           </FieldGroup>
 
-          <FieldGroup title="b. Passive Income (Bucket 2 — เงินปันผล/บำนาญ)">
+          <FieldGroup title="Passive Income — ค่าเช่า/บำนาญ">
             <NumberField
               label="รายได้ต่อปี"
               value={inputs.passive.annualIncome}
@@ -124,55 +129,49 @@ export function BucketStrategyCalculator() {
             />
           </FieldGroup>
 
-          <FieldGroup title="c. Low Risk (Bucket 3 — ตราสารหนี้)" columns={3}>
+          <FieldGroup title="Low Risk (Bucket 2 — ตราสารหนี้)">
             <NumberField
               label="มูลค่าปัจจุบัน"
-              value={inputs.bond.pv}
-              onChange={(v) => update("bond", { ...inputs.bond, pv: Math.max(0, v) })}
+              value={inputs.lowRisk.pv}
+              onChange={(v) => update("lowRisk", { ...inputs.lowRisk, pv: Math.max(0, v) })}
+              suffix="บาท"
+              min={0}
+              hint="ค่านี้คือเป้าหมาย (เพดาน) ที่ระบบจะพยายามรักษาระดับให้ตรงทุกปี"
+            />
+            <NumberField
+              label="ผลตอบแทนต่อปี"
+              value={inputs.lowRisk.returnPct}
+              onChange={(v) => update("lowRisk", { ...inputs.lowRisk, returnPct: v })}
+              suffix="%"
+            />
+          </FieldGroup>
+
+          <FieldGroup title="High Risk / Growth (Bucket 3 — หุ้น/ETF)" columns={3}>
+            <NumberField
+              label="มูลค่าปัจจุบัน"
+              value={inputs.highRisk.pv}
+              onChange={(v) => update("highRisk", { ...inputs.highRisk, pv: Math.max(0, v) })}
               suffix="บาท"
               min={0}
             />
             <NumberField
               label="ผลตอบแทนต่อปี"
-              value={inputs.bond.returnPct}
-              onChange={(v) => update("bond", { ...inputs.bond, returnPct: v })}
+              value={inputs.highRisk.returnPct}
+              onChange={(v) => update("highRisk", { ...inputs.highRisk, returnPct: v })}
               suffix="%"
             />
             <NumberField
-              label="เพดานการไถ่ถอนเข้า B1"
-              value={inputs.bond.redemptionToB1Pct}
-              onChange={(v) => update("bond", { ...inputs.bond, redemptionToB1Pct: Math.max(0, v) })}
+              label="เพดานการไถ่ถอนเข้า B2"
+              value={inputs.highRisk.redemptionToB2Pct}
+              onChange={(v) => update("highRisk", { ...inputs.highRisk, redemptionToB2Pct: Math.max(0, v) })}
               suffix="%/ปี"
               min={0}
               max={100}
+              hint="จำกัดว่าปีหนึ่งโอนเข้า Low Risk ได้มากสุดกี่ % ของ High Risk"
             />
           </FieldGroup>
 
-          <FieldGroup title="d. High Risk / Growth (Bucket 4 — หุ้น/ETF)" columns={3}>
-            <NumberField
-              label="มูลค่าปัจจุบัน"
-              value={inputs.growth.pv}
-              onChange={(v) => update("growth", { ...inputs.growth, pv: Math.max(0, v) })}
-              suffix="บาท"
-              min={0}
-            />
-            <NumberField
-              label="ผลตอบแทนต่อปี"
-              value={inputs.growth.returnPct}
-              onChange={(v) => update("growth", { ...inputs.growth, returnPct: v })}
-              suffix="%"
-            />
-            <NumberField
-              label="เพดานการไถ่ถอนเข้า B1"
-              value={inputs.growth.redemptionToB1Pct}
-              onChange={(v) => update("growth", { ...inputs.growth, redemptionToB1Pct: Math.max(0, v) })}
-              suffix="%/ปี"
-              min={0}
-              max={100}
-            />
-          </FieldGroup>
-
-          <FieldGroup title="e. Spending & Horizon (ถอนออกจาก Bucket 1)" columns={3}>
+          <FieldGroup title="Spending & Horizon (ถอนออกจาก Bucket 1)" columns={3}>
             <NumberField
               label="รายจ่ายต่อเดือน"
               value={inputs.spending.monthlySpending}
@@ -202,31 +201,35 @@ export function BucketStrategyCalculator() {
       <Card>
         <CardHeader>
           <CardTitle>สรุปเงินตั้งต้น</CardTitle>
-          <CardDescription>มูลค่ารวมของ Bucket 1, 3 และ 4 ณ วันเริ่มต้น (ไม่รวม Bucket 2 ซึ่งเป็นกระแสรายได้)</CardDescription>
+          <CardDescription>
+            มูลค่ารวมของ Safe / Steady, Low Risk และ High Risk ณ วันเริ่มต้น (ไม่รวม Passive Income ซึ่งเป็นกระแสรายได้ ไม่ใช่เงินก้อน)
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           <BigStat label="เงินตั้งต้นรวม" value={`${formatBaht(result.startingWealth)} บาท`} />
           <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
-            <div style={{ width: `${proportions.safe * 100}%`, background: bucketColors.cash }} />
-            <div style={{ width: `${proportions.bond * 100}%`, background: bucketColors.bond }} />
-            <div style={{ width: `${proportions.growth * 100}%`, background: bucketColors.growth }} />
+            <div style={{ width: `${proportions.safe * 100}%`, background: bucketColors.safe }} />
+            <div style={{ width: `${proportions.lowRisk * 100}%`, background: bucketColors.lowRisk }} />
+            <div style={{ width: `${proportions.highRisk * 100}%`, background: bucketColors.highRisk }} />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="flex items-center gap-2 text-sm">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: bucketColors.cash }} />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: bucketColors.safe }} />
               <span className="text-muted-foreground">Safe / Steady</span>
               <span className="ml-auto font-semibold text-foreground">{formatPercent(proportions.safe * 100)}%</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: bucketColors.bond }} />
-              <span className="text-muted-foreground">Low Risk (Bond)</span>
-              <span className="ml-auto font-semibold text-foreground">{formatPercent(proportions.bond * 100)}%</span>
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: bucketColors.lowRisk }} />
+              <span className="text-muted-foreground">Low Risk</span>
+              <span className="ml-auto font-semibold text-foreground">
+                {formatPercent(proportions.lowRisk * 100)}%
+              </span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: bucketColors.growth }} />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: bucketColors.highRisk }} />
               <span className="text-muted-foreground">High Risk / Growth</span>
               <span className="ml-auto font-semibold text-foreground">
-                {formatPercent(proportions.growth * 100)}%
+                {formatPercent(proportions.highRisk * 100)}%
               </span>
             </div>
           </div>
@@ -235,19 +238,19 @@ export function BucketStrategyCalculator() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <BigStat
-          label="Bucket 3 (Bond) หมดในปีที่"
-          value={result.bondDepletedYear ? `ปีที่ ${result.bondDepletedYear}` : "ไม่หมด"}
-          tone={result.bondDepletedYear ? "destructive" : "success"}
+          label="Low Risk หมดในปีที่"
+          value={result.lowRiskDepletedYear ? `ปีที่ ${result.lowRiskDepletedYear}` : "ไม่หมด"}
+          tone={result.lowRiskDepletedYear ? "destructive" : "success"}
         />
         <BigStat
-          label="Bucket 4 (Growth) หมดในปีที่"
-          value={result.growthDepletedYear ? `ปีที่ ${result.growthDepletedYear}` : "ไม่หมด"}
-          tone={result.growthDepletedYear ? "destructive" : "success"}
+          label="High Risk / Growth หมดในปีที่"
+          value={result.highRiskDepletedYear ? `ปีที่ ${result.highRiskDepletedYear}` : "ไม่หมด"}
+          tone={result.highRiskDepletedYear ? "destructive" : "success"}
         />
         <BigStat
           label="เงินไม่พอใช้จ่ายจริงในปีที่"
           value={result.insolventYear ? `ปีที่ ${result.insolventYear}` : "ไม่เกิดขึ้น"}
-          sub={result.insolventYear ? "ทั้ง Bond และ Growth หมดแล้ว ไม่เหลือเงินให้ดึงมาใช้จ่ายอีก" : undefined}
+          sub={result.insolventYear ? "ทั้ง Low Risk และ High Risk หมดแล้ว ไม่เหลือเงินให้ดึงมาใช้จ่ายอีก" : undefined}
           tone={result.insolventYear ? "destructive" : "success"}
         />
       </div>
@@ -281,29 +284,29 @@ export function BucketStrategyCalculator() {
                 <Legend />
                 <Area
                   type="monotone"
-                  dataKey="cash"
-                  name="Bucket 1 · Cash"
+                  dataKey="safe"
+                  name="Bucket 1 · Safe / Steady"
                   stackId="1"
-                  stroke={bucketColors.cash}
-                  fill={bucketColors.cash}
+                  stroke={bucketColors.safe}
+                  fill={bucketColors.safe}
                   fillOpacity={0.6}
                 />
                 <Area
                   type="monotone"
-                  dataKey="bond"
-                  name="Bucket 3 · Bond"
+                  dataKey="lowRisk"
+                  name="Bucket 2 · Low Risk"
                   stackId="1"
-                  stroke={bucketColors.bond}
-                  fill={bucketColors.bond}
+                  stroke={bucketColors.lowRisk}
+                  fill={bucketColors.lowRisk}
                   fillOpacity={0.6}
                 />
                 <Area
                   type="monotone"
-                  dataKey="growth"
-                  name="Bucket 4 · Growth"
+                  dataKey="highRisk"
+                  name="Bucket 3 · High Risk / Growth"
                   stackId="1"
-                  stroke={bucketColors.growth}
-                  fill={bucketColors.growth}
+                  stroke={bucketColors.highRisk}
+                  fill={bucketColors.highRisk}
                   fillOpacity={0.6}
                 />
               </AreaChart>
@@ -317,23 +320,23 @@ export function BucketStrategyCalculator() {
           <CardHeader>
             <CardTitle>ผลการจำลอง Monte Carlo</CardTitle>
             <CardDescription>
-              สุ่มผลตอบแทนรายปีของ Bond และ Growth 500 ครั้ง ตามค่าเฉลี่ยและความผันผวนที่กำหนด
+              สุ่มผลตอบแทนรายปีของ Low Risk และ High Risk 500 ครั้ง ตามค่าเฉลี่ยและความผันผวนที่กำหนด
               (Safe และ Passive Income ยังคงใช้ค่าคงที่ตามที่ตั้งไว้ด้านบน)
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             <FieldGroup>
               <NumberField
-                label="ความผันผวนของ Bond (SD ต่อปี)"
-                value={bondVolatilityPct}
-                onChange={setBondVolatilityPct}
+                label="ความผันผวนของ Low Risk (SD ต่อปี)"
+                value={lowRiskVolatilityPct}
+                onChange={setLowRiskVolatilityPct}
                 suffix="%"
                 min={0}
               />
               <NumberField
-                label="ความผันผวนของ Growth (SD ต่อปี)"
-                value={growthVolatilityPct}
-                onChange={setGrowthVolatilityPct}
+                label="ความผันผวนของ High Risk (SD ต่อปี)"
+                value={highRiskVolatilityPct}
+                onChange={setHighRiskVolatilityPct}
                 suffix="%"
                 min={0}
               />
@@ -347,24 +350,24 @@ export function BucketStrategyCalculator() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <BigStat
-                label="โอกาสที่ Bucket 3 (Bond) จะหมดภายในระยะเวลาจำลอง"
-                value={`${formatPercent(mcResult.bondDepletionProbability * 100)}%`}
+                label="โอกาสที่ Low Risk จะหมดภายในระยะเวลาจำลอง"
+                value={`${formatPercent(mcResult.lowRiskDepletionProbability * 100)}%`}
                 sub={
-                  mcResult.medianBondDepletedYear
-                    ? `เมื่อหมด มักหมดราวปีที่ ${mcResult.medianBondDepletedYear} (มัธยฐาน)`
+                  mcResult.medianLowRiskDepletedYear
+                    ? `เมื่อหมด มักหมดราวปีที่ ${mcResult.medianLowRiskDepletedYear} (มัธยฐาน)`
                     : undefined
                 }
-                tone={mcResult.bondDepletionProbability > 0.2 ? "destructive" : "success"}
+                tone={mcResult.lowRiskDepletionProbability > 0.2 ? "destructive" : "success"}
               />
               <BigStat
-                label="โอกาสที่ Bucket 4 (Growth) จะหมดภายในระยะเวลาจำลอง"
-                value={`${formatPercent(mcResult.growthDepletionProbability * 100)}%`}
+                label="โอกาสที่ High Risk / Growth จะหมดภายในระยะเวลาจำลอง"
+                value={`${formatPercent(mcResult.highRiskDepletionProbability * 100)}%`}
                 sub={
-                  mcResult.medianGrowthDepletedYear
-                    ? `เมื่อหมด มักหมดราวปีที่ ${mcResult.medianGrowthDepletedYear} (มัธยฐาน)`
+                  mcResult.medianHighRiskDepletedYear
+                    ? `เมื่อหมด มักหมดราวปีที่ ${mcResult.medianHighRiskDepletedYear} (มัธยฐาน)`
                     : undefined
                 }
-                tone={mcResult.growthDepletionProbability > 0.2 ? "destructive" : "success"}
+                tone={mcResult.highRiskDepletionProbability > 0.2 ? "destructive" : "success"}
               />
               <BigStat
                 label="โอกาสที่เงินไม่พอใช้จ่ายจริง (Insolvency)"
@@ -393,9 +396,9 @@ export function BucketStrategyCalculator() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              พื้นที่แรเงาคือช่วงมูลค่าทรัพย์สินรวม (Cash + Bond + Growth) ตั้งแต่ 10th ถึง 90th percentile
-              จากการจำลอง 500 ครั้ง ซึ่งแต่ละครั้งใช้กลไกการเติมเงินและ Market Regime แบบเดียวกับด้านบน
-              เพียงแต่ผลตอบแทนรายปีของ Bond และ Growth ถูกสุ่มขึ้นใหม่ทุกครั้ง
+              พื้นที่แรเงาคือช่วงมูลค่าทรัพย์สินรวม (Safe + Low Risk + High Risk) ตั้งแต่ 10th ถึง 90th percentile
+              จากการจำลอง 500 ครั้ง ซึ่งแต่ละครั้งใช้กลไกการใช้จ่ายและรักษาสมดุลแบบเดียวกับด้านบน
+              เพียงแต่ผลตอบแทนรายปีของ Low Risk และ High Risk ถูกสุ่มขึ้นใหม่ทุกครั้ง
             </p>
           </CardContent>
         </Card>
@@ -406,59 +409,56 @@ export function BucketStrategyCalculator() {
           <p>
             <span className="font-semibold text-foreground">Bucket 1 · Safe / Steady:</span> เงินสำรองใช้จ่าย
             เก็บในเงินฝาก กองทุนตลาดเงิน (MMF) หรือตราสารหนี้ระยะสั้น สภาพคล่องสูง ผันผวนต่ำ
-            ใช้จ่ายประจำวันโดยตรงจากถังนี้
+            ใช้จ่ายประจำวันโดยตรงจากถังนี้เสมอ
           </p>
           <p>
-            <span className="font-semibold text-foreground">Bucket 2 · Passive Income:</span>{" "}
-            กระแสรายได้จากเงินปันผล กอง REIT หรือกองทุนเน้นจ่ายรายได้ เงินที่ได้รับ (หลังหักภาษี)
-            จะถูกนำเข้าไปสมทบในถังเงินสดทุกปีโดยตรง
+            <span className="font-semibold text-foreground">Passive Income:</span> กระแสรายได้จากค่าเช่า เงินบำนาญ
+            เงินปันผล หรือกอง REIT เงินที่ได้รับ (หลังหักภาษี) จะถูกนำเข้าไปสมทบ Bucket 1 ทุกปีโดยตรง
+            ไม่ใช่เงินก้อนจึงไม่นับเป็นถัง
           </p>
           <p>
-            <span className="font-semibold text-foreground">Bucket 3 · Low Risk (Bond):</span>{" "}
-            ตราสารหนี้ ความเสี่ยงปานกลางค่อนข้างต่ำ ทำหน้าที่เป็นแหล่งเติมเงินสดในช่วงตลาดผันผวน
-            เพื่อไม่ต้องขายหุ้นตอนราคาตก
+            <span className="font-semibold text-foreground">Bucket 2 · Low Risk:</span> ตราสารหนี้ ความเสี่ยงปานกลางค่อนข้างต่ำ
+            ทำหน้าที่เป็นแหล่งเติมเงินสดหลักเมื่อ Bucket 1 ไม่พอ และเป็นตัวกลางที่ High Risk ใช้เติมเงินให้
+            มูลค่าตั้งต้นของถังนี้จะกลายเป็น &ldquo;เป้าหมาย&rdquo; ที่ระบบพยายามรักษาไว้ตลอดการจำลอง
           </p>
           <p>
-            <span className="font-semibold text-foreground">Bucket 4 · High Risk / Growth:</span>{" "}
-            หุ้น ETF หรือกองทุนธีมการลงทุน ผลตอบแทนคาดหวังสูงสุดในระยะยาว
-            เป็นเครื่องยนต์หลักในการเติบโตของพอร์ตและเป็นแหล่งเติมเงินสดหลักในช่วงตลาดปกติ
+            <span className="font-semibold text-foreground">Bucket 3 · High Risk / Growth:</span> หุ้น ETF
+            หรือกองทุนธีมการลงทุน ผลตอบแทนคาดหวังสูงสุดในระยะยาว เป็นเครื่องยนต์หลักในการเติบโตของพอร์ต
+            และเป็นแหล่งสุดท้ายที่จะถูกดึงมาใช้เมื่อถังอื่นไม่พอ
           </p>
         </InfoBlock>
 
-        <InfoBlock heading="กลไกการเติมเงิน (Refill Mechanism) และ Market Regime">
+        <InfoBlock heading="ลำดับการคำนวณในแต่ละปี">
           <p>
-            ทุกสิ้นปี ระบบจะตรวจสอบว่าถังเงินสด (Bucket 1) มีเพียงพอต่อรายจ่ายที่ตั้งเป้าไว้หรือไม่
-            (ค่าเริ่มต้น: สำรอง {BUCKET_POLICY_DEFAULTS.reserveYears} ปีของรายจ่ายสุทธิ)
-            หากไม่พอ ระบบจะเติมเงินจากถังอื่นตามกฎที่กำหนดไว้ล่วงหน้า แทนการตัดสินใจเฉพาะหน้า
+            ทุกปีระบบจะทำ 3 ขั้นตอนตามลำดับนี้เสมอ ไม่มีการสลับลำดับตามสภาวะตลาดอีกต่อไป:
+          </p>
+          <BucketWaterfallDiagram />
+          <p>
+            <span className="font-semibold text-foreground">ขั้นที่ 1 — ใช้จ่าย:</span> นำ Passive Income
+            (หลังหักภาษี) มาบวกและหักรายจ่ายของปีนั้นออกจาก Bucket 1 ก่อนเสมอ
+          </p>
+          <BucketMaintenanceDiagram />
+          <p>
+            <span className="font-semibold text-foreground">ขั้นที่ 2 — รักษาระดับ Low Risk:</span> เปรียบเทียบ Low Risk
+            กับมูลค่าตั้งต้นของมัน (เป้าหมาย) หากสูงกว่าเป้าหมาย ส่วนเกินทั้งหมดจะโอนไปที่ Bucket 1 ทันที
+            (ซึ่งอาจช่วยชดเชยการใช้จ่ายในขั้นที่ 1 ได้โดยไม่ต้องรอถึงขั้นที่ 3) หากต่ำกว่าเป้าหมาย High Risk / Growth
+            จะโอนมาเติมให้ แต่ไม่เกิน &ldquo;เพดานการไถ่ถอนเข้า B2 (%/ปี)&rdquo; ที่กำหนดไว้ และไม่เติมเกินเป้าหมาย
           </p>
           <p>
-            การเลือกว่าจะดึงเงินจากถังไหนก่อนขึ้นอยู่กับ &ldquo;สภาวะตลาด&rdquo; (Market Regime) ซึ่งประเมินจาก
-            การลดลงของมูลค่า Bucket 4 เทียบกับจุดสูงสุดที่เคยทำได้ (Drawdown) — หากลดลงเกิน{" "}
-            {formatPercent(BUCKET_POLICY_DEFAULTS.drawdownBadThreshold * 100)}% ถือว่าเป็นช่วง{" "}
-            <span className="font-semibold text-foreground">&ldquo;Bad Phase&rdquo;</span> นอกนั้นถือเป็น{" "}
-            <span className="font-semibold text-foreground">&ldquo;Good Phase&rdquo;</span>
-          </p>
-          <BucketFlowDiagram />
-          <BucketSurplusDiagram />
-          <p>
-            ทุกการดึงเงินจากถัง Bond หรือ Growth เข้าสู่ Bucket 1 จะถูกจำกัดด้วย &ldquo;เพดานการไถ่ถอนเข้า B1
-            (%/ปี)&rdquo; ที่กำหนดไว้ เพื่อไม่ให้ดึงเงินออกจากถังใดถังหนึ่งมากเกินไปในปีเดียว
-            และเปิดโอกาสให้ถัง Growth มีเวลาฟื้นตัวหลังช่วงตลาดตก
-          </p>
-          <p>
-            <span className="font-semibold text-foreground">ข้อยกเว้นเพื่อความอยู่รอด:</span> เพดานนี้ใช้เฉพาะการเติมเงินเข้าสู่
-            &ldquo;เงินสำรอง 1 ปี&rdquo; ตามปกติเท่านั้น หากถึงขั้นที่เงินสดไม่พอสำหรับรายจ่ายจริงในปีนั้น (ไม่ใช่แค่ต่ำกว่าเป้าเงินสำรอง)
-            ระบบจะดึงเงินเพิ่มจากถัง Bond/Growth ตามลำดับความสำคัญเดิม โดยไม่ยึดติดกับเพดานอีกต่อไป
-            เพราะการมีเงินพอใช้จ่ายในแต่ละปีสำคัญกว่าการรักษาเพดานการถอน จะถือว่า &ldquo;เงินไม่พอใช้จ่ายจริง&rdquo;
-            ก็ต่อเมื่อทั้ง Bond และ Growth หมดแล้วเท่านั้น
+            <span className="font-semibold text-foreground">ขั้นที่ 3 — ถ้ายังไม่พอ (Survival Waterfall):</span>{" "}
+            หากหลังขั้นที่ 1-2 แล้ว Bucket 1 ยังติดลบ (เงินไม่พอใช้จ่ายจริงในปีนั้น) ระบบจะดึงเงินจาก Low Risk
+            มาเติมก่อน เท่าที่จำเป็น โดย<span className="font-semibold text-foreground">ไม่มีเพดานจำกัด</span> —
+            ถ้ายังไม่พออีก จึงดึงจาก High Risk / Growth เพิ่มเติมจนกว่าจะพอ เพราะการมีเงินพอใช้จ่ายในแต่ละปี
+            สำคัญกว่าการรักษาสัดส่วนหรือเป้าหมายใด ๆ จะถือว่า &ldquo;เงินไม่พอใช้จ่ายจริง&rdquo; ก็ต่อเมื่อทั้ง Low Risk
+            และ High Risk หมดแล้วเท่านั้น
           </p>
         </InfoBlock>
 
         <InfoBlock heading="ข้อควรระวัง">
           <p>
-            โหมดปกติ (ด้านบน) จำลองด้วยอัตราผลตอบแทนคงที่ต่อปีตามที่คุณกำหนด เหมาะสำหรับดูกลไกการเติมเงินแบบชัดเจน
+            โหมดปกติ (ด้านบน) จำลองด้วยอัตราผลตอบแทนคงที่ต่อปีตามที่คุณกำหนด เหมาะสำหรับดูกลไกการใช้จ่ายและรักษาสมดุลแบบชัดเจน
             ส่วนโหมด Monte Carlo จะช่วยให้เห็นความเสี่ยงจากความผันผวนของตลาดในแต่ละปี (Sequence of Returns Risk)
-            ได้สมจริงมากขึ้น ทั้งสองโหมดเป็นเพียงภาพประกอบแนวคิดกลยุทธ์ 4 ถัง ไม่ใช่คำแนะนำการลงทุน
+            ได้สมจริงมากขึ้น ทั้งสองโหมดเป็นเพียงภาพประกอบแนวคิดกลยุทธ์ 3 ถัง ไม่ใช่คำแนะนำการลงทุน
             ผลตอบแทนจริงของสินทรัพย์แต่ละประเภทมีความผันผวนและไม่สามารถรับประกันได้
           </p>
         </InfoBlock>

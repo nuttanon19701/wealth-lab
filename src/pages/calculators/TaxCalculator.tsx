@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 
 import { BigStat } from "@/components/calculator/BigStat"
 import { FieldGroup, NumberField, ReadonlyField, SliderNumberField } from "@/components/calculator/fields"
@@ -17,6 +17,7 @@ import {
   SOCIAL_SECURITY_CAP,
   type TaxInputs,
 } from "@/calculators/tax"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { formatBaht, formatPercent } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -36,7 +37,7 @@ const defaultInputs: TaxInputs = {
 }
 
 export function TaxCalculator() {
-  const [inputs, setInputs] = useState<TaxInputs>(defaultInputs)
+  const [inputs, setInputs] = useCalculatorState<TaxInputs>("tax-inputs", defaultInputs)
 
   const result = useMemo(() => calculateTax(inputs), [inputs])
   const incomePctCap = result.totalIncome * ESG_INCOME_PCT_CAP

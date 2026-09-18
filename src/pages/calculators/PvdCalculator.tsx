@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 
 import { BigStat } from "@/components/calculator/BigStat"
 import { FieldGroup, NumberField, NumberWithFrequencyField, NumberWithOptionsField } from "@/components/calculator/fields"
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Frequency } from "@/calculators/dca"
 import { growthFrequencyOptions, type GrowthFrequency } from "@/calculators/frequency"
 import { calculatePvd, type PvdCompounding, type PvdInputs } from "@/calculators/pvd"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { formatBaht } from "@/lib/format"
 
 const defaultInputs: PvdInputs = {
@@ -35,7 +36,7 @@ const compoundingOptions: { value: PvdCompounding; label: string }[] = [
 ]
 
 export function PvdCalculator() {
-  const [inputs, setInputs] = useState<PvdInputs>(defaultInputs)
+  const [inputs, setInputs] = useCalculatorState<PvdInputs>("pvd-inputs", defaultInputs)
 
   const result = useMemo(() => calculatePvd(inputs), [inputs])
 

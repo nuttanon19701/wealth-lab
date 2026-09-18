@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import {
   CartesianGrid,
   Legend,
@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { growthFrequencyOptions, type GrowthFrequency } from "@/calculators/frequency"
 import { calculateRetirement, type RetirementInputs } from "@/calculators/retirement"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { formatBaht, formatBahtCompact } from "@/lib/format"
 
 const defaultInputs: RetirementInputs = {
@@ -36,7 +37,7 @@ const defaultInputs: RetirementInputs = {
 }
 
 export function RetirementCalculator() {
-  const [inputs, setInputs] = useState<RetirementInputs>(defaultInputs)
+  const [inputs, setInputs] = useCalculatorState<RetirementInputs>("retirement-inputs", defaultInputs)
 
   const result = useMemo(() => calculateRetirement(inputs), [inputs])
   const totalYears = Math.max(0, Math.round(inputs.targetAge - inputs.currentAge))

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import {
   CartesianGrid,
   Legend,
@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { calculateDca, type DcaInputs, type Frequency } from "@/calculators/dca"
 import { runDcaMonteCarlo } from "@/calculators/dcaMonteCarlo"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { formatBaht, formatBahtCompact } from "@/lib/format"
 
 const defaultInputs: DcaInputs = {
@@ -35,9 +36,9 @@ const defaultInputs: DcaInputs = {
 const defaultVolatilityPct = 15
 
 export function DcaCalculator() {
-  const [inputs, setInputs] = useState<DcaInputs>(defaultInputs)
-  const [monteCarloEnabled, setMonteCarloEnabled] = useState(false)
-  const [volatilityPct, setVolatilityPct] = useState(defaultVolatilityPct)
+  const [inputs, setInputs] = useCalculatorState<DcaInputs>("dca-inputs", defaultInputs)
+  const [monteCarloEnabled, setMonteCarloEnabled] = useCalculatorState("dca-mc-enabled", false)
+  const [volatilityPct, setVolatilityPct] = useCalculatorState("dca-mc-volatility", defaultVolatilityPct)
 
   const result = useMemo(() => calculateDca(inputs), [inputs])
 

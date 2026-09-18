@@ -1,5 +1,3 @@
-export type Regime = "good" | "bad"
-
 export interface BucketInputs {
   safe: {
     pv: number
@@ -9,15 +7,14 @@ export interface BucketInputs {
     annualIncome: number
     taxPct: number
   }
-  bond: {
+  lowRisk: {
     pv: number
     returnPct: number
-    redemptionToB1Pct: number
   }
-  growth: {
+  highRisk: {
     pv: number
     returnPct: number
-    redemptionToB1Pct: number
+    redemptionToB2Pct: number
   }
   spending: {
     monthlySpending: number
@@ -28,19 +25,16 @@ export interface BucketInputs {
 
 export interface BucketYearRow {
   year: number
-  regime: Regime
   spending: number
   passiveIncomeNet: number
-  cash: number
-  bond: number
-  growth: number
+  safe: number
+  lowRisk: number
+  highRisk: number
   totalWealth: number
-  refillFromGrowth: number
-  refillFromBond: number
-  sweepBondToGrowth: number
-  topUpBondFromGrowth: number
-  unmetShortfall: number
-  emergencyWithdrawal: number
+  sweepLowRiskToSafe: number
+  topUpLowRiskFromHighRisk: number
+  drawFromLowRisk: number
+  drawFromHighRisk: number
   insolvent: boolean
 }
 
@@ -49,40 +43,46 @@ export interface BucketResult {
   startingWealth: number
   startingProportions: {
     safe: number
-    bond: number
-    growth: number
+    lowRisk: number
+    highRisk: number
   }
-  bondDepletedYear: number | null
-  growthDepletedYear: number | null
+  lowRiskDepletedYear: number | null
+  highRiskDepletedYear: number | null
   insolventYear: number | null
 }
 
-// Default policy assumptions (documented for the reader in the UI):
-const RESERVE_YEARS = 1 // Bucket 1 target reserve = N years of net spending
-const DRAWDOWN_BAD_THRESHOLD = 0.15 // >15% drawdown from the growth bucket's peak => "bad" regime
-const BOND_TOLERANCE = 0.1 // +/-10% band around the bond bucket's target level
 const DEPLETION_EPSILON = 1
 
+/**
+ * Each year runs in three steps, in this order:
+ *
+ *  A. Fund spending: Safe absorbs net passive income minus this year's spending.
+ *  B. Rebalance Low Risk toward its target level (its own starting PV). If Low
+ *     Risk sits above target, the excess sweeps into Safe (which can rescue a
+ *     shortfall from step A "for free"). If it sits below target, High Risk
+ *     tops it up, capped by High Risk's "redemption to B2" rate.
+ *  C. Survival waterfall: if Safe is still negative after A and B, pull
+ *     whatever is needed — uncapped — from Low Risk first, then High Risk.
+ *     Spending must be covered before any cap or target is honored.
+ */
 export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
-  const { safe, passive, bond, growth, spending } = inputs
+  const { safe, passive, lowRisk, highRisk, spending } = inputs
 
-  const startingWealth = safe.pv + bond.pv + growth.pv
+  const startingWealth = safe.pv + lowRisk.pv + highRisk.pv
   const startingProportions = {
     safe: startingWealth > 0 ? safe.pv / startingWealth : 0,
-    bond: startingWealth > 0 ? bond.pv / startingWealth : 0,
-    growth: startingWealth > 0 ? growth.pv / startingWealth : 0,
+    lowRisk: startingWealth > 0 ? lowRisk.pv / startingWealth : 0,
+    highRisk: startingWealth > 0 ? highRisk.pv / startingWealth : 0,
   }
 
-  let cash = safe.pv
-  let bondBalance = bond.pv
-  let growthBalance = growth.pv
-  let growthPeak = growth.pv
-
-  const bondTarget = bond.pv
+  let safeBalance = safe.pv
+  let lowRiskBalance = lowRisk.pv
+  let highRiskBalance = highRisk.pv
+  const lowRiskTarget = lowRisk.pv
 
   const rows: BucketYearRow[] = []
-  let bondDepletedYear: number | null = null
-  let growthDepletedYear: number | null = null
+  let lowRiskDepletedYear: number | null = null
+  let highRiskDepletedYear: number | null = null
   let insolventYear: number | null = null
 
   const totalYears = Math.max(0, Math.round(spending.years))
@@ -91,126 +91,74 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
     const spendingThisYear = spending.monthlySpending * 12 * Math.pow(1 + spending.inflationPct / 100, year - 1)
     const passiveIncomeNet = passive.annualIncome * (1 - passive.taxPct / 100)
 
-    cash *= 1 + safe.returnPct / 100
-    bondBalance *= 1 + bond.returnPct / 100
-    growthBalance *= 1 + growth.returnPct / 100
+    safeBalance *= 1 + safe.returnPct / 100
+    lowRiskBalance *= 1 + lowRisk.returnPct / 100
+    highRiskBalance *= 1 + highRisk.returnPct / 100
 
-    if (growthBalance > growthPeak) growthPeak = growthBalance
-    const drawdown = growthPeak > 0 ? (growthPeak - growthBalance) / growthPeak : 0
-    const regime: Regime = drawdown > DRAWDOWN_BAD_THRESHOLD ? "bad" : "good"
+    // Step A: fund spending from Safe + Passive Income.
+    safeBalance += passiveIncomeNet - spendingThisYear
 
-    cash += passiveIncomeNet - spendingThisYear
+    // Step B: keep Low Risk near its target level.
+    let sweepLowRiskToSafe = 0
+    let topUpLowRiskFromHighRisk = 0
 
-    let refillFromGrowth = 0
-    let refillFromBond = 0
-    let sweepBondToGrowth = 0
-    let topUpBondFromGrowth = 0
-    let unmetShortfall = 0
-    let emergencyWithdrawal = 0
+    if (lowRiskBalance > lowRiskTarget) {
+      sweepLowRiskToSafe = lowRiskBalance - lowRiskTarget
+      lowRiskBalance -= sweepLowRiskToSafe
+      safeBalance += sweepLowRiskToSafe
+    } else if (lowRiskBalance < lowRiskTarget) {
+      const need = lowRiskTarget - lowRiskBalance
+      const cap = highRiskBalance * (highRisk.redemptionToB2Pct / 100)
+      topUpLowRiskFromHighRisk = Math.min(need, cap, highRiskBalance)
+      lowRiskBalance += topUpLowRiskFromHighRisk
+      highRiskBalance -= topUpLowRiskFromHighRisk
+    }
 
-    const reserveTarget = spendingThisYear * RESERVE_YEARS
+    // Step C: survival waterfall — spending must be covered even beyond target/caps.
+    let drawFromLowRisk = 0
+    let drawFromHighRisk = 0
 
-    if (cash < reserveTarget) {
-      let shortfall = reserveTarget - cash
-      const order: Array<"bond" | "growth"> = regime === "good" ? ["growth", "bond"] : ["bond", "growth"]
+    if (safeBalance < 0) {
+      let need = -safeBalance
 
-      // Phase 1: normal, capped refill toward the reserve target (protects buckets
-      // from over-withdrawal under ordinary conditions).
-      for (const source of order) {
-        if (shortfall <= 0) break
-        if (source === "growth") {
-          const cap = growthBalance * (growth.redemptionToB1Pct / 100)
-          const transfer = Math.min(shortfall, cap, growthBalance)
-          if (transfer > 0) {
-            growthBalance -= transfer
-            cash += transfer
-            shortfall -= transfer
-            refillFromGrowth += transfer
-          }
-        } else {
-          const cap = bondBalance * (bond.redemptionToB1Pct / 100)
-          const transfer = Math.min(shortfall, cap, bondBalance)
-          if (transfer > 0) {
-            bondBalance -= transfer
-            cash += transfer
-            shortfall -= transfer
-            refillFromBond += transfer
-          }
-        }
-      }
+      drawFromLowRisk = Math.min(need, lowRiskBalance)
+      lowRiskBalance -= drawFromLowRisk
+      safeBalance += drawFromLowRisk
+      need -= drawFromLowRisk
 
-      unmetShortfall = Math.max(shortfall, 0)
-
-      // Phase 2: survival override. If the capped refill still leaves this year's
-      // spending uncovered (cash below zero, not just below the reserve target),
-      // pull whatever is still needed beyond the cap — spending must be met first.
-      if (cash < 0) {
-        let emergencyNeed = -cash
-        for (const source of order) {
-          if (emergencyNeed <= 0) break
-          if (source === "growth") {
-            const transfer = Math.min(emergencyNeed, growthBalance)
-            if (transfer > 0) {
-              growthBalance -= transfer
-              cash += transfer
-              emergencyNeed -= transfer
-              refillFromGrowth += transfer
-              emergencyWithdrawal += transfer
-            }
-          } else {
-            const transfer = Math.min(emergencyNeed, bondBalance)
-            if (transfer > 0) {
-              bondBalance -= transfer
-              cash += transfer
-              emergencyNeed -= transfer
-              refillFromBond += transfer
-              emergencyWithdrawal += transfer
-            }
-          }
-        }
-      }
-    } else if (regime === "good") {
-      if (bondBalance > bondTarget * (1 + BOND_TOLERANCE)) {
-        sweepBondToGrowth = bondBalance - bondTarget
-        bondBalance -= sweepBondToGrowth
-        growthBalance += sweepBondToGrowth
-      } else if (bondBalance < bondTarget * (1 - BOND_TOLERANCE)) {
-        topUpBondFromGrowth = Math.min(bondTarget - bondBalance, growthBalance)
-        bondBalance += topUpBondFromGrowth
-        growthBalance -= topUpBondFromGrowth
+      if (need > 0) {
+        drawFromHighRisk = Math.min(need, highRiskBalance)
+        highRiskBalance -= drawFromHighRisk
+        safeBalance += drawFromHighRisk
+        need -= drawFromHighRisk
       }
     }
 
-    if (bondBalance < DEPLETION_EPSILON) {
-      bondBalance = 0
-      if (bondDepletedYear === null) bondDepletedYear = year
+    if (lowRiskBalance < DEPLETION_EPSILON) {
+      lowRiskBalance = 0
+      if (lowRiskDepletedYear === null) lowRiskDepletedYear = year
     }
-    if (growthBalance < DEPLETION_EPSILON) {
-      growthBalance = 0
-      if (growthDepletedYear === null) growthDepletedYear = year
+    if (highRiskBalance < DEPLETION_EPSILON) {
+      highRiskBalance = 0
+      if (highRiskDepletedYear === null) highRiskDepletedYear = year
     }
 
-    // True insolvency: even the uncapped emergency withdrawal (Phase 2) couldn't
-    // cover this year's spending because both buckets are fully drained.
-    const insolvent = cash < 0
+    const insolvent = safeBalance < 0
     if (insolvent && insolventYear === null) insolventYear = year
-    if (cash < 0) cash = 0
+    if (safeBalance < 0) safeBalance = 0
 
     rows.push({
       year,
-      regime,
       spending: spendingThisYear,
       passiveIncomeNet,
-      cash,
-      bond: bondBalance,
-      growth: growthBalance,
-      totalWealth: cash + bondBalance + growthBalance,
-      refillFromGrowth,
-      refillFromBond,
-      sweepBondToGrowth,
-      topUpBondFromGrowth,
-      unmetShortfall,
-      emergencyWithdrawal,
+      safe: safeBalance,
+      lowRisk: lowRiskBalance,
+      highRisk: highRiskBalance,
+      totalWealth: safeBalance + lowRiskBalance + highRiskBalance,
+      sweepLowRiskToSafe,
+      topUpLowRiskFromHighRisk,
+      drawFromLowRisk,
+      drawFromHighRisk,
       insolvent,
     })
   }
@@ -219,14 +167,8 @@ export function calculateBucketStrategy(inputs: BucketInputs): BucketResult {
     rows,
     startingWealth,
     startingProportions,
-    bondDepletedYear,
-    growthDepletedYear,
+    lowRiskDepletedYear,
+    highRiskDepletedYear,
     insolventYear,
   }
-}
-
-export const BUCKET_POLICY_DEFAULTS = {
-  reserveYears: RESERVE_YEARS,
-  drawdownBadThreshold: DRAWDOWN_BAD_THRESHOLD,
-  bondTolerance: BOND_TOLERANCE,
 }

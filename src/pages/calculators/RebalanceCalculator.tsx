@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 
 import { FormattedNumberInput } from "@/components/calculator/FormattedNumberInput"
 import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { calculateRebalance, createEmptyAsset, type RebalanceAsset } from "@/calculators/rebalance"
+import { useCalculatorState } from "@/lib/calculatorStateStore"
 import { formatBaht, formatPercent } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -20,8 +21,8 @@ const defaultAssets: RebalanceAsset[] = [
 ]
 
 export function RebalanceCalculator() {
-  const [portfolioName, setPortfolioName] = useState("พอร์ตการลงทุนของฉัน")
-  const [assets, setAssets] = useState<RebalanceAsset[]>(defaultAssets)
+  const [portfolioName, setPortfolioName] = useCalculatorState("rebalance-portfolio-name", "พอร์ตการลงทุนของฉัน")
+  const [assets, setAssets] = useCalculatorState<RebalanceAsset[]>("rebalance-assets", defaultAssets)
 
   const result = useMemo(() => calculateRebalance(assets), [assets])
 

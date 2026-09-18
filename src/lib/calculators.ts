@@ -89,9 +89,9 @@ export const calculators: CalculatorMeta[] = [
   {
     id: "bucket-strategy",
     path: "/calculators/bucket-strategy",
-    name: "Retirement Bucket Strategy",
-    shortName: "4 Bucket",
-    description: "จำลองกลยุทธ์แบ่งเงินเกษียณเป็น 4 ถัง (Cash / Passive Income / Bond / Growth)",
+    name: "3 Bucket Strategies",
+    shortName: "3 Bucket",
+    description: "จำลองกลยุทธ์แบ่งเงินเกษียณเป็น 3 ถัง (Safe / Low Risk / High Risk) พร้อม Passive Income",
     icon: Layers,
   },
 ]

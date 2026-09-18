@@ -1,10 +1,9 @@
-import { BUCKET_POLICY_DEFAULTS } from "@/calculators/bucket"
 import { DEFAULT_SIMULATIONS, gaussianRandom, percentile } from "@/calculators/montecarlo"
-import type { BucketInputs, Regime } from "@/calculators/bucket"
+import type { BucketInputs } from "@/calculators/bucket"
 
 export interface BucketMonteCarloInputs extends BucketInputs {
-  bondVolatilityPct: number
-  growthVolatilityPct: number
+  lowRiskVolatilityPct: number
+  highRiskVolatilityPct: number
   simulations?: number
 }
 
@@ -22,146 +21,114 @@ export interface BucketMonteCarloResult {
   medianFinal: number
   p10Final: number
   p90Final: number
-  bondDepletionProbability: number
-  growthDepletionProbability: number
-  medianBondDepletedYear: number | null
-  medianGrowthDepletedYear: number | null
+  lowRiskDepletionProbability: number
+  highRiskDepletionProbability: number
+  medianLowRiskDepletedYear: number | null
+  medianHighRiskDepletedYear: number | null
   insolvencyProbability: number
   medianInsolventYear: number | null
 }
 
-const { reserveYears: RESERVE_YEARS, drawdownBadThreshold: DRAWDOWN_BAD_THRESHOLD, bondTolerance: BOND_TOLERANCE } =
-  BUCKET_POLICY_DEFAULTS
 const DEPLETION_EPSILON = 1
 
 export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonteCarloResult {
-  const { safe, passive, bond, growth, spending, bondVolatilityPct, growthVolatilityPct, simulations = DEFAULT_SIMULATIONS } =
-    inputs
+  const {
+    safe,
+    passive,
+    lowRisk,
+    highRisk,
+    spending,
+    lowRiskVolatilityPct,
+    highRiskVolatilityPct,
+    simulations = DEFAULT_SIMULATIONS,
+  } = inputs
 
   const totalYears = Math.max(0, Math.round(spending.years))
-  const bondTarget = bond.pv
+  const lowRiskTarget = lowRisk.pv
 
   const wealthByYear: number[][] = Array.from({ length: totalYears }, () => [])
   const finalValues: number[] = []
-  const bondDepletedYears: number[] = []
-  const growthDepletedYears: number[] = []
+  const lowRiskDepletedYears: number[] = []
+  const highRiskDepletedYears: number[] = []
   const insolventYears: number[] = []
-  let bondDepletedCount = 0
-  let growthDepletedCount = 0
+  let lowRiskDepletedCount = 0
+  let highRiskDepletedCount = 0
   let insolventCount = 0
 
   for (let sim = 0; sim < simulations; sim++) {
-    let cash = safe.pv
-    let bondBalance = bond.pv
-    let growthBalance = growth.pv
-    let growthPeak = growth.pv
-    let bondDepletedYear: number | null = null
-    let growthDepletedYear: number | null = null
+    let safeBalance = safe.pv
+    let lowRiskBalance = lowRisk.pv
+    let highRiskBalance = highRisk.pv
+    let lowRiskDepletedYear: number | null = null
+    let highRiskDepletedYear: number | null = null
     let insolventYear: number | null = null
 
     for (let year = 1; year <= totalYears; year++) {
       const spendingThisYear = spending.monthlySpending * 12 * Math.pow(1 + spending.inflationPct / 100, year - 1)
       const passiveIncomeNet = passive.annualIncome * (1 - passive.taxPct / 100)
 
-      const bondReturn = gaussianRandom(bond.returnPct / 100, bondVolatilityPct / 100)
-      const growthReturn = gaussianRandom(growth.returnPct / 100, growthVolatilityPct / 100)
+      const lowRiskReturn = gaussianRandom(lowRisk.returnPct / 100, lowRiskVolatilityPct / 100)
+      const highRiskReturn = gaussianRandom(highRisk.returnPct / 100, highRiskVolatilityPct / 100)
 
-      cash *= 1 + safe.returnPct / 100
-      bondBalance *= 1 + bondReturn
-      growthBalance *= 1 + growthReturn
-      if (bondBalance < 0) bondBalance = 0
-      if (growthBalance < 0) growthBalance = 0
+      safeBalance *= 1 + safe.returnPct / 100
+      lowRiskBalance *= 1 + lowRiskReturn
+      highRiskBalance *= 1 + highRiskReturn
+      if (lowRiskBalance < 0) lowRiskBalance = 0
+      if (highRiskBalance < 0) highRiskBalance = 0
 
-      if (growthBalance > growthPeak) growthPeak = growthBalance
-      const drawdown = growthPeak > 0 ? (growthPeak - growthBalance) / growthPeak : 0
-      const regime: Regime = drawdown > DRAWDOWN_BAD_THRESHOLD ? "bad" : "good"
+      safeBalance += passiveIncomeNet - spendingThisYear
 
-      cash += passiveIncomeNet - spendingThisYear
+      if (lowRiskBalance > lowRiskTarget) {
+        const sweep = lowRiskBalance - lowRiskTarget
+        lowRiskBalance -= sweep
+        safeBalance += sweep
+      } else if (lowRiskBalance < lowRiskTarget) {
+        const need = lowRiskTarget - lowRiskBalance
+        const cap = highRiskBalance * (highRisk.redemptionToB2Pct / 100)
+        const topUp = Math.min(need, cap, highRiskBalance)
+        lowRiskBalance += topUp
+        highRiskBalance -= topUp
+      }
 
-      const reserveTarget = spendingThisYear * RESERVE_YEARS
+      if (safeBalance < 0) {
+        let need = -safeBalance
 
-      if (cash < reserveTarget) {
-        let shortfall = reserveTarget - cash
-        const order: Array<"bond" | "growth"> = regime === "good" ? ["growth", "bond"] : ["bond", "growth"]
+        const fromLowRisk = Math.min(need, lowRiskBalance)
+        lowRiskBalance -= fromLowRisk
+        safeBalance += fromLowRisk
+        need -= fromLowRisk
 
-        for (const source of order) {
-          if (shortfall <= 0) break
-          if (source === "growth") {
-            const cap = growthBalance * (growth.redemptionToB1Pct / 100)
-            const transfer = Math.min(shortfall, cap, growthBalance)
-            if (transfer > 0) {
-              growthBalance -= transfer
-              cash += transfer
-              shortfall -= transfer
-            }
-          } else {
-            const cap = bondBalance * (bond.redemptionToB1Pct / 100)
-            const transfer = Math.min(shortfall, cap, bondBalance)
-            if (transfer > 0) {
-              bondBalance -= transfer
-              cash += transfer
-              shortfall -= transfer
-            }
-          }
-        }
-
-        // Survival override: spending must be covered even beyond the redemption cap.
-        if (cash < 0) {
-          let emergencyNeed = -cash
-          for (const source of order) {
-            if (emergencyNeed <= 0) break
-            if (source === "growth") {
-              const transfer = Math.min(emergencyNeed, growthBalance)
-              if (transfer > 0) {
-                growthBalance -= transfer
-                cash += transfer
-                emergencyNeed -= transfer
-              }
-            } else {
-              const transfer = Math.min(emergencyNeed, bondBalance)
-              if (transfer > 0) {
-                bondBalance -= transfer
-                cash += transfer
-                emergencyNeed -= transfer
-              }
-            }
-          }
-        }
-      } else if (regime === "good") {
-        if (bondBalance > bondTarget * (1 + BOND_TOLERANCE)) {
-          const sweep = bondBalance - bondTarget
-          bondBalance -= sweep
-          growthBalance += sweep
-        } else if (bondBalance < bondTarget * (1 - BOND_TOLERANCE)) {
-          const topUp = Math.min(bondTarget - bondBalance, growthBalance)
-          bondBalance += topUp
-          growthBalance -= topUp
+        if (need > 0) {
+          const fromHighRisk = Math.min(need, highRiskBalance)
+          highRiskBalance -= fromHighRisk
+          safeBalance += fromHighRisk
+          need -= fromHighRisk
         }
       }
 
-      if (bondBalance < DEPLETION_EPSILON) {
-        bondBalance = 0
-        if (bondDepletedYear === null) bondDepletedYear = year
+      if (lowRiskBalance < DEPLETION_EPSILON) {
+        lowRiskBalance = 0
+        if (lowRiskDepletedYear === null) lowRiskDepletedYear = year
       }
-      if (growthBalance < DEPLETION_EPSILON) {
-        growthBalance = 0
-        if (growthDepletedYear === null) growthDepletedYear = year
+      if (highRiskBalance < DEPLETION_EPSILON) {
+        highRiskBalance = 0
+        if (highRiskDepletedYear === null) highRiskDepletedYear = year
       }
 
-      if (cash < 0 && insolventYear === null) insolventYear = year
-      if (cash < 0) cash = 0
+      if (safeBalance < 0 && insolventYear === null) insolventYear = year
+      if (safeBalance < 0) safeBalance = 0
 
-      wealthByYear[year - 1].push(cash + bondBalance + growthBalance)
+      wealthByYear[year - 1].push(safeBalance + lowRiskBalance + highRiskBalance)
     }
 
-    finalValues.push(cash + bondBalance + growthBalance)
-    if (bondDepletedYear !== null) {
-      bondDepletedCount++
-      bondDepletedYears.push(bondDepletedYear)
+    finalValues.push(safeBalance + lowRiskBalance + highRiskBalance)
+    if (lowRiskDepletedYear !== null) {
+      lowRiskDepletedCount++
+      lowRiskDepletedYears.push(lowRiskDepletedYear)
     }
-    if (growthDepletedYear !== null) {
-      growthDepletedCount++
-      growthDepletedYears.push(growthDepletedYear)
+    if (highRiskDepletedYear !== null) {
+      highRiskDepletedCount++
+      highRiskDepletedYears.push(highRiskDepletedYear)
     }
     if (insolventYear !== null) {
       insolventCount++
@@ -180,8 +147,8 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
   })
 
   const sortedFinal = [...finalValues].sort((a, b) => a - b)
-  const sortedBondDepleted = [...bondDepletedYears].sort((a, b) => a - b)
-  const sortedGrowthDepleted = [...growthDepletedYears].sort((a, b) => a - b)
+  const sortedLowRiskDepleted = [...lowRiskDepletedYears].sort((a, b) => a - b)
+  const sortedHighRiskDepleted = [...highRiskDepletedYears].sort((a, b) => a - b)
   const sortedInsolvent = [...insolventYears].sort((a, b) => a - b)
 
   return {
@@ -190,10 +157,10 @@ export function runBucketMonteCarlo(inputs: BucketMonteCarloInputs): BucketMonte
     medianFinal: percentile(sortedFinal, 0.5),
     p10Final: percentile(sortedFinal, 0.1),
     p90Final: percentile(sortedFinal, 0.9),
-    bondDepletionProbability: simulations > 0 ? bondDepletedCount / simulations : 0,
-    growthDepletionProbability: simulations > 0 ? growthDepletedCount / simulations : 0,
-    medianBondDepletedYear: sortedBondDepleted.length > 0 ? percentile(sortedBondDepleted, 0.5) : null,
-    medianGrowthDepletedYear: sortedGrowthDepleted.length > 0 ? percentile(sortedGrowthDepleted, 0.5) : null,
+    lowRiskDepletionProbability: simulations > 0 ? lowRiskDepletedCount / simulations : 0,
+    highRiskDepletionProbability: simulations > 0 ? highRiskDepletedCount / simulations : 0,
+    medianLowRiskDepletedYear: sortedLowRiskDepleted.length > 0 ? percentile(sortedLowRiskDepleted, 0.5) : null,
+    medianHighRiskDepletedYear: sortedHighRiskDepleted.length > 0 ? percentile(sortedHighRiskDepleted, 0.5) : null,
     insolvencyProbability: simulations > 0 ? insolventCount / simulations : 0,
     medianInsolventYear: sortedInsolvent.length > 0 ? percentile(sortedInsolvent, 0.5) : null,
   }
