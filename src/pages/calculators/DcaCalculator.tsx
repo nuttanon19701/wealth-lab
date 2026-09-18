@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { calculateDca, type DcaInputs, type Frequency } from "@/calculators/dca"
 import { runDcaMonteCarlo } from "@/calculators/dcaMonteCarlo"
-import { formatBaht } from "@/lib/format"
+import { formatBaht, formatBahtCompact } from "@/lib/format"
 
 const defaultInputs: DcaInputs = {
   years: 20,
@@ -150,10 +150,10 @@ export function DcaCalculator() {
                   stroke="var(--muted-foreground)"
                 />
                 <YAxis
-                  tickFormatter={(v) => formatBaht(Number(v))}
+                  tickFormatter={(v) => formatBahtCompact(Number(v))}
                   className="text-xs"
                   stroke="var(--muted-foreground)"
-                  width={70}
+                  width={56}
                 />
                 <Tooltip
                   formatter={(value) => `${formatBaht(Number(value))} บาท`}
@@ -221,7 +221,7 @@ export function DcaCalculator() {
                 p90Key="p90"
                 extraLine={{ key: "deposit", name: "เงินลงทุนสะสม", color: "var(--chart-2)" }}
                 xTickFormatter={(v) => `ปี ${v}`}
-                yTickFormatter={(v) => formatBaht(v)}
+                yTickFormatter={(v) => formatBahtCompact(v)}
                 tooltipFormatter={(v) => `${formatBaht(v)} บาท`}
               />
             </div>

@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { growthFrequencyOptions, type GrowthFrequency } from "@/calculators/frequency"
 import { calculateRetirement, type RetirementInputs } from "@/calculators/retirement"
-import { formatBaht } from "@/lib/format"
+import { formatBaht, formatBahtCompact } from "@/lib/format"
 
 const defaultInputs: RetirementInputs = {
   currentAge: 30,
@@ -198,18 +198,18 @@ export function RetirementCalculator() {
                 <YAxis
                   yAxisId="flow"
                   orientation="left"
-                  tickFormatter={(v) => formatBaht(Number(v))}
+                  tickFormatter={(v) => formatBahtCompact(Number(v))}
                   className="text-xs"
                   stroke="var(--chart-2)"
-                  width={70}
+                  width={56}
                 />
                 <YAxis
                   yAxisId="asset"
                   orientation="right"
-                  tickFormatter={(v) => formatBaht(Number(v))}
+                  tickFormatter={(v) => formatBahtCompact(Number(v))}
                   className="text-xs"
                   stroke="var(--chart-1)"
-                  width={70}
+                  width={56}
                 />
                 <Tooltip
                   formatter={(value) => `${formatBaht(Number(value))} บาท`}

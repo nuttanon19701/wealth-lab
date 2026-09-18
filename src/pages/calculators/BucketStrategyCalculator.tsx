@@ -19,7 +19,7 @@ import { MonteCarloToggle } from "@/components/calculator/MonteCarloToggle"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { BUCKET_POLICY_DEFAULTS, calculateBucketStrategy, type BucketInputs } from "@/calculators/bucket"
 import { runBucketMonteCarlo } from "@/calculators/bucketMonteCarlo"
-import { formatBaht, formatPercent } from "@/lib/format"
+import { formatBaht, formatBahtCompact, formatPercent } from "@/lib/format"
 
 const defaultInputs: BucketInputs = {
   safe: { pv: 300000, returnPct: 1.5 },
@@ -263,10 +263,10 @@ export function BucketStrategyCalculator() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="year" tickFormatter={(v) => `ปี ${v}`} className="text-xs" stroke="var(--muted-foreground)" />
                 <YAxis
-                  tickFormatter={(v) => formatBaht(Number(v))}
+                  tickFormatter={(v) => formatBahtCompact(Number(v))}
                   className="text-xs"
                   stroke="var(--muted-foreground)"
-                  width={70}
+                  width={56}
                 />
                 <Tooltip
                   formatter={(value) => `${formatBaht(Number(value))} บาท`}
@@ -387,7 +387,7 @@ export function BucketStrategyCalculator() {
                 p90Key="p90"
                 p50Name="เงินคงเหลือรวม (มัธยฐาน)"
                 xTickFormatter={(v) => `ปี ${v}`}
-                yTickFormatter={(v) => formatBaht(v)}
+                yTickFormatter={(v) => formatBahtCompact(v)}
                 tooltipFormatter={(v) => `${formatBaht(v)} บาท`}
               />
             </div>

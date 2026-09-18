@@ -62,11 +62,18 @@ export function About() {
           <CardTitle className="text-lg">ผู้จัดทำ</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div>
-            <p className="text-base font-semibold text-foreground">
-              ณัฐฐนนท์ ทรงสุวรรณ (Nuttanon Songsuwan)
-            </p>
-            <p className="text-sm text-muted-foreground">ผู้ก่อตั้งและผู้จัดทำ Wealth Lab</p>
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <img
+              src="/images/nuttanon.jpg"
+              alt="ณัฐฐนนท์ ทรงสุวรรณ"
+              className="h-24 w-24 shrink-0 rounded-full border border-border object-cover"
+            />
+            <div>
+              <p className="text-base font-semibold text-foreground">
+                ณัฐฐนนท์ ทรงสุวรรณ (Nuttanon Songsuwan)
+              </p>
+              <p className="text-sm text-muted-foreground">ผู้ก่อตั้งและผู้จัดทำ Wealth Lab</p>
+            </div>
           </div>
 
           <ul className="flex flex-col gap-3">

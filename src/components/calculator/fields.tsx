@@ -3,7 +3,9 @@ import type { ReactNode } from "react"
 import { FormattedNumberInput } from "@/components/calculator/FormattedNumberInput"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
 import type { Frequency } from "@/calculators/dca"
+import { formatBaht } from "@/lib/format"
 
 interface NumberFieldProps {
   label: string
@@ -140,6 +142,61 @@ export function ReadonlyField({ label, value, hint }: ReadonlyFieldProps) {
         {value}
       </div>
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  )
+}
+
+interface SliderNumberFieldProps {
+  label: string
+  value: number
+  onChange: (value: number) => void
+  max: number
+  min?: number
+  step?: number
+  suffix?: string
+  hint?: string
+}
+
+export function SliderNumberField({
+  label,
+  value,
+  onChange,
+  max,
+  min = 0,
+  step = 1000,
+  suffix = "บาท",
+  hint,
+}: SliderNumberFieldProps) {
+  const sliderMax = Math.max(max, min + 1)
+  const clampedValue = Math.min(Math.max(value, min), sliderMax)
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Label>{label}</Label>
+        <div className="relative w-36 shrink-0">
+          <FormattedNumberInput
+            value={value}
+            onChange={(v) => onChange(Math.min(Math.max(v, min), max))}
+            className={suffix ? "h-8 pr-12 text-sm" : "h-8 text-sm"}
+          />
+          {suffix && (
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              {suffix}
+            </span>
+          )}
+        </div>
+      </div>
+      <Slider
+        value={[clampedValue]}
+        min={min}
+        max={sliderMax}
+        step={step}
+        onValueChange={([v]) => onChange(Math.min(Math.max(v, min), max))}
+      />
+      <p className="text-xs text-muted-foreground">
+        {hint ?? `หักได้สูงสุด ${formatBaht(max)} บาท`}
+      </p>
     </div>
   )
 }

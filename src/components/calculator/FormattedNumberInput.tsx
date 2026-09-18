@@ -1,6 +1,7 @@
 import { useState } from "react"
 
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 function formatDisplay(value: number): string {
   if (!Number.isFinite(value)) return ""
@@ -43,7 +44,7 @@ export function FormattedNumberInput({ value, onChange, className, placeholder }
         if (!Number.isNaN(num)) onChange(num)
       }}
       onBlur={() => setFocused(false)}
-      className={className}
+      className={cn("text-right tabular-nums", className)}
     />
   )
 }

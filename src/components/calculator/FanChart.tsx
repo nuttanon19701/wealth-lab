@@ -46,7 +46,7 @@ export function FanChart({
       <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
         <XAxis dataKey={xKey} tickFormatter={xTickFormatter} className="text-xs" stroke="var(--muted-foreground)" />
-        <YAxis tickFormatter={yTickFormatter} className="text-xs" stroke="var(--muted-foreground)" width={70} />
+        <YAxis tickFormatter={yTickFormatter} className="text-xs" stroke="var(--muted-foreground)" width={56} />
         <Tooltip
           formatter={(value) => tooltipFormatter(Number(value))}
           labelFormatter={(v) => xTickFormatter(Number(v))}

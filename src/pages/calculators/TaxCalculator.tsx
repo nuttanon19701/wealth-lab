@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 
 import { BigStat } from "@/components/calculator/BigStat"
-import { FieldGroup, NumberField, ReadonlyField } from "@/components/calculator/fields"
+import { FieldGroup, NumberField, ReadonlyField, SliderNumberField } from "@/components/calculator/fields"
 import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -10,7 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   calculateTax,
   ESG_CAP,
+  ESG_INCOME_PCT_CAP,
   RETIREMENT_FUNDS_CAP,
+  RETIREMENT_GROUP_CAP,
+  RMF_CAP,
   SOCIAL_SECURITY_CAP,
   type TaxInputs,
 } from "@/calculators/tax"
@@ -23,10 +26,12 @@ const defaultInputs: TaxInputs = {
   otherIncome: 0,
   bonus: 50000,
   withholdingTax: 25000,
-  socialSecurity: 9000,
+  socialSecurity: 10500,
   retirementFunds: 50000,
+  rmf: 0,
   thaiEsgX: 0,
   thaiEsgXFromLtf: 0,
+  thaiEsg: 0,
   otherDeductions: 0,
 }
 
@@ -34,10 +39,16 @@ export function TaxCalculator() {
   const [inputs, setInputs] = useState<TaxInputs>(defaultInputs)
 
   const result = useMemo(() => calculateTax(inputs), [inputs])
+  const incomePctCap = result.totalIncome * ESG_INCOME_PCT_CAP
+  const rmfCap = Math.min(RMF_CAP, incomePctCap)
+  const esgCap = Math.min(ESG_CAP, incomePctCap)
 
   function update<K extends keyof TaxInputs>(key: K, value: TaxInputs[K]) {
     setInputs((prev) => ({ ...prev, [key]: value }))
   }
+
+  const retirementGroupTrimmed =
+    result.retirementFundsDeduction + result.rmfDeduction > result.retirementGroupDeduction + 0.01
 
   return (
     <div className="flex flex-col gap-6">
@@ -112,7 +123,7 @@ export function TaxCalculator() {
 
           <FieldGroup title="ค่าลดหย่อนการออม/การลงทุน" columns={2}>
             <NumberField
-              label="เงินประกันสังคม"
+              label="เบี้ยประกันสังคม"
               value={inputs.socialSecurity}
               onChange={(v) => update("socialSecurity", Math.max(0, v))}
               suffix="บาท"
@@ -120,15 +131,47 @@ export function TaxCalculator() {
               hint={`ไม่เกิน ${formatBaht(SOCIAL_SECURITY_CAP)} บาท`}
             />
             <NumberField
-              label="กองทุนกลุ่มเกษียณ (ไม่รวม RMF)"
+              label="กองทุนกลุ่มเกษียณ ยังไม่รวม RMF"
               value={inputs.retirementFunds}
               onChange={(v) => update("retirementFunds", Math.max(0, v))}
               suffix="บาท"
               min={0}
-              hint={`ไม่เกิน ${formatBaht(RETIREMENT_FUNDS_CAP)} บาท`}
+              hint={`กองทุนสำรองเลี้ยงชีพ, กบข, กอช, ประกันบำนาญ — ไม่เกิน ${formatBaht(RETIREMENT_FUNDS_CAP)} บาท (ไม่รวมเงินสมทบจากนายจ้าง)`}
             />
+          </FieldGroup>
+
+          <FieldGroup columns={1}>
+            <SliderNumberField
+              label="RMF"
+              value={inputs.rmf}
+              onChange={(v) => update("rmf", v)}
+              max={rmfCap}
+              step={5000}
+              hint={`ไม่เกิน 30% ของรายได้ทั้งปี สูงสุด ${formatBaht(RMF_CAP)} บาท และเมื่อรวมกับกองทุนกลุ่มเกษียณอื่นด้านบนแล้วต้องไม่เกิน ${formatBaht(RETIREMENT_GROUP_CAP)} บาท`}
+            />
+          </FieldGroup>
+
+          {retirementGroupTrimmed && (
+            <p className="text-sm text-destructive">
+              กองทุนกลุ่มเกษียณ + RMF รวมกันเกิน {formatBaht(RETIREMENT_GROUP_CAP)} บาท
+              ระบบจึงนับลดหย่อนได้เพียง {formatBaht(result.retirementGroupDeduction)} บาท
+            </p>
+          )}
+
+          <FieldGroup columns={1}>
+            <SliderNumberField
+              label="ThaiESG"
+              value={inputs.thaiEsg}
+              onChange={(v) => update("thaiEsg", v)}
+              max={esgCap}
+              step={5000}
+              hint={`ไม่เกิน 30% ของรายได้ทั้งปี สูงสุด ${formatBaht(ESG_CAP)} บาท`}
+            />
+          </FieldGroup>
+
+          <FieldGroup title="กองทุน ThaiESGX" columns={2}>
             <NumberField
-              label="กองทุน ThaiESGX"
+              label="ThaiESGX"
               value={inputs.thaiEsgX}
               onChange={(v) => update("thaiEsgX", Math.max(0, v))}
               suffix="บาท"
@@ -136,7 +179,7 @@ export function TaxCalculator() {
               hint={`ไม่เกิน 30% ของรายได้ทั้งปี สูงสุด ${formatBaht(ESG_CAP)} บาท`}
             />
             <NumberField
-              label="กองทุน ThaiESGX โอนจาก LTF"
+              label="ThaiESGX โอนจาก LTF"
               value={inputs.thaiEsgXFromLtf}
               onChange={(v) => update("thaiEsgXFromLtf", Math.max(0, v))}
               suffix="บาท"
@@ -152,7 +195,7 @@ export function TaxCalculator() {
               onChange={(v) => update("otherDeductions", Math.max(0, v))}
               suffix="บาท"
               min={0}
-              hint="เช่น ดอกเบี้ยบ้าน ประกันชีวิต บริจาค ฯลฯ"
+              hint="เช่น ช้อปดีมีคืน ดอกเบี้ยบ้าน อุปการะบิดามารดา ค่าคลอดบุตร และอื่นๆ ที่สามารถหักได้ตามกฎหมาย"
             />
           </FieldGroup>
         </CardContent>
@@ -228,6 +271,14 @@ export function TaxCalculator() {
           <p>
             เงินได้ประเภท 40(1) (เงินเดือน/ค่าจ้าง) สามารถหักค่าใช้จ่ายแบบเหมาได้ 50% ของเงินได้ แต่ไม่เกิน 100,000 บาท
             ก่อนจะนำมาหักค่าลดหย่อนต่าง ๆ เพื่อหาเงินได้สุทธิที่ใช้เป็นฐานคำนวณภาษี
+          </p>
+        </InfoBlock>
+        <InfoBlock heading="วางแผนภาษีด้วย RMF และ ThaiESG">
+          <p>
+            RMF (Retirement Mutual Fund) และ ThaiESG เป็นกองทุนลดหย่อนภาษีเพื่อการออมระยะยาว ลากแถบเลื่อนหรือพิมพ์ตัวเลขโดยตรง
+            เพื่อดูผลกระทบต่อภาษีที่ต้องจ่ายแบบทันที RMF มีเพดานของตัวเองที่ 30% ของรายได้ทั้งปี สูงสุด 500,000 บาท
+            และเมื่อรวมกับกองทุนกลุ่มเกษียณอื่น (กองทุนสำรองเลี้ยงชีพ, กบข, กอช, ประกันบำนาญ) แล้วต้องไม่เกิน 500,000 บาทรวมกัน
+            ส่วน ThaiESG มีเพดานแยกต่างหากที่ 30% ของรายได้ทั้งปี สูงสุด 300,000 บาท
           </p>
         </InfoBlock>
         <InfoBlock heading="ข้อควรระวัง">
