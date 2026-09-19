@@ -67,7 +67,12 @@ function Arrow({
         markerEnd={`url(#arrow-${id})`}
       />
       {label && (
-        <text x={(x1 + x2) / 2 + 14} y={(y1 + y2) / 2} textAnchor="middle" className="fill-primary text-[11px] font-semibold">
+        <text
+          x={Math.max(x1, x2) + 10}
+          y={(y1 + y2) / 2}
+          textAnchor="start"
+          className="fill-primary text-[11px] font-semibold"
+        >
           {label}
         </text>
       )}
