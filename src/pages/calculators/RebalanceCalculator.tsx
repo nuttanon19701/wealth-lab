@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from "lucide-react"
 import { useMemo } from "react"
 
+import { AllocationDonutChart } from "@/components/calculator/AllocationDonutChart"
 import { FormattedNumberInput } from "@/components/calculator/FormattedNumberInput"
 import { InfoBlock, InfoSection } from "@/components/calculator/InfoSection"
 import { Button } from "@/components/ui/button"
@@ -190,6 +191,23 @@ export function RebalanceCalculator() {
             <Plus className="h-4 w-4" />
             เพิ่มสินทรัพย์
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>สัดส่วนสินทรัพย์</CardTitle>
+          <CardDescription>เปรียบเทียบสัดส่วนปัจจุบันกับสัดส่วนเป้าหมายของแต่ละสินทรัพย์</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+          <AllocationDonutChart
+            title="สัดส่วนปัจจุบัน"
+            data={result.rows.map((r) => ({ name: r.name, value: r.currentValue }))}
+          />
+          <AllocationDonutChart
+            title="สัดส่วนเป้าหมาย"
+            data={result.rows.map((r) => ({ name: r.name, value: r.expectedPct }))}
+          />
         </CardContent>
       </Card>
 

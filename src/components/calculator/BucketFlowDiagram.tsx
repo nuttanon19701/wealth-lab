@@ -115,13 +115,13 @@ export function BucketMaintenanceDiagram() {
         <p className="text-sm font-semibold text-foreground">การรักษาระดับ Low Risk ให้ตรงเป้าหมาย</p>
         <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">ทำทุกปี</span>
       </div>
-      <svg viewBox="0 0 320 190" className="h-auto w-full">
-        <Box x={8} y={12} w={130} h={48} label="Bucket 3 · High Risk" variant="muted" />
-        <Box x={182} y={12} w={130} h={48} label="Safe / Steady" variant="primary" />
-        <Box x={95} y={122} w={130} h={48} label="Bucket 2 · Low Risk" variant="accent" />
+      <svg viewBox="0 0 320 260" className="h-auto w-full">
+        <Box x={20} y={12} w={280} h={48} label="Bucket 3 · High Risk / Growth" variant="muted" />
+        <Box x={20} y={106} w={280} h={48} label="Bucket 2 · Low Risk" variant="accent" />
+        <Box x={20} y={200} w={280} h={48} label="Safe / Steady" variant="primary" />
 
-        <Arrow id="mnt-1" x1={90} y1={60} x2={140} y2={120} label="เติม" />
-        <Arrow id="mnt-2" x1={230} y1={120} x2={247} y2={62} label="ส่วนเกิน" />
+        <Arrow id="mnt-1" x1={160} y1={60} x2={160} y2={104} label="เติม" />
+        <Arrow id="mnt-2" x1={160} y1={154} x2={160} y2={198} label="ส่วนเกิน" />
       </svg>
       <div className="flex flex-col gap-1 text-xs text-muted-foreground">
         <p>
