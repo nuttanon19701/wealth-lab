@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Calculator,
   Info,
   Landmark,
@@ -97,6 +98,12 @@ export const calculators: CalculatorMeta[] = [
 ]
 
 export const otherNav = [
+  {
+    id: "knowledge",
+    path: "/knowledge",
+    name: "ความรู้ทางการเงิน",
+    icon: BookOpen,
+  },
   {
     id: "about",
     path: "/about",
