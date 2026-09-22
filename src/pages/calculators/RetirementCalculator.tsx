@@ -64,6 +64,35 @@ export function RetirementCalculator() {
     setInputs((prev) => ({ ...prev, [key]: value }))
   }
 
+  function renderSingleLineChart(dataKey: "income" | "expense" | "asset", name: string, color: string) {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+          <XAxis dataKey="age" tickFormatter={(v) => `อายุ ${v}`} className="text-xs" stroke="var(--muted-foreground)" />
+          <YAxis
+            tickFormatter={(v) => formatBahtCompact(Number(v))}
+            className="text-xs"
+            stroke="var(--muted-foreground)"
+            width={56}
+          />
+          <Tooltip
+            formatter={(value) => `${formatBaht(Number(value))} บาท`}
+            labelFormatter={(v) => `อายุ ${v}`}
+            contentStyle={{
+              background: "var(--popover)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              color: "var(--popover-foreground)",
+            }}
+          />
+          <Legend />
+          <Line type="monotone" dataKey={dataKey} name={name} stroke={color} strokeWidth={2.5} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -181,78 +210,98 @@ export function RetirementCalculator() {
       <Card>
         <CardHeader>
           <CardTitle>รายได้ รายจ่าย และสินทรัพย์ตลอดช่วงชีวิต</CardTitle>
-          <CardDescription>
-            รายได้และรายจ่ายแสดงเป็นยอดรวมต่อปี (แกนซ้าย) ส่วนสินทรัพย์แสดงมูลค่า ณ สิ้นปี (แกนขวา)
-          </CardDescription>
+          <CardDescription>เลือกดูทีละเส้น หรือดูรวมกันทั้ง 3 เส้น</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis
-                  dataKey="age"
-                  tickFormatter={(v) => `อายุ ${v}`}
-                  className="text-xs"
-                  stroke="var(--muted-foreground)"
-                />
-                <YAxis
-                  yAxisId="flow"
-                  orientation="left"
-                  tickFormatter={(v) => formatBahtCompact(Number(v))}
-                  className="text-xs"
-                  stroke="var(--chart-2)"
-                  width={56}
-                />
-                <YAxis
-                  yAxisId="asset"
-                  orientation="right"
-                  tickFormatter={(v) => formatBahtCompact(Number(v))}
-                  className="text-xs"
-                  stroke="var(--chart-1)"
-                  width={56}
-                />
-                <Tooltip
-                  formatter={(value) => `${formatBaht(Number(value))} บาท`}
-                  labelFormatter={(v) => `อายุ ${v}`}
-                  contentStyle={{
-                    background: "var(--popover)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    color: "var(--popover-foreground)",
-                  }}
-                />
-                <Legend />
-                <Line
-                  yAxisId="flow"
-                  type="monotone"
-                  dataKey="income"
-                  name="รายได้ (รวมต่อปี)"
-                  stroke="var(--chart-2)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  yAxisId="flow"
-                  type="monotone"
-                  dataKey="expense"
-                  name="รายจ่าย (รวมต่อปี)"
-                  stroke="var(--chart-4)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  yAxisId="asset"
-                  type="monotone"
-                  dataKey="asset"
-                  name="สินทรัพย์"
-                  stroke="var(--chart-1)"
-                  strokeWidth={2.5}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <Tabs defaultValue="all">
+            <TabsList>
+              <TabsTrigger value="income">รายได้</TabsTrigger>
+              <TabsTrigger value="expense">รายจ่าย</TabsTrigger>
+              <TabsTrigger value="asset">สินทรัพย์</TabsTrigger>
+              <TabsTrigger value="all">รวมทั้ง 3 เส้น</TabsTrigger>
+            </TabsList>
+            <TabsContent value="income">
+              <div className="h-80 w-full">{renderSingleLineChart("income", "รายได้ (รวมต่อปี)", "var(--chart-2)")}</div>
+            </TabsContent>
+            <TabsContent value="expense">
+              <div className="h-80 w-full">{renderSingleLineChart("expense", "รายจ่าย (รวมต่อปี)", "var(--chart-4)")}</div>
+            </TabsContent>
+            <TabsContent value="asset">
+              <div className="h-80 w-full">{renderSingleLineChart("asset", "สินทรัพย์", "var(--chart-1)")}</div>
+            </TabsContent>
+            <TabsContent value="all">
+              <p className="mb-2 text-xs text-muted-foreground">
+                รายได้และรายจ่ายแสดงเป็นยอดรวมต่อปี (แกนซ้าย) ส่วนสินทรัพย์แสดงมูลค่า ณ สิ้นปี (แกนขวา)
+              </p>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis
+                      dataKey="age"
+                      tickFormatter={(v) => `อายุ ${v}`}
+                      className="text-xs"
+                      stroke="var(--muted-foreground)"
+                    />
+                    <YAxis
+                      yAxisId="flow"
+                      orientation="left"
+                      tickFormatter={(v) => formatBahtCompact(Number(v))}
+                      className="text-xs"
+                      stroke="var(--chart-2)"
+                      width={56}
+                    />
+                    <YAxis
+                      yAxisId="asset"
+                      orientation="right"
+                      tickFormatter={(v) => formatBahtCompact(Number(v))}
+                      className="text-xs"
+                      stroke="var(--chart-1)"
+                      width={56}
+                    />
+                    <Tooltip
+                      formatter={(value) => `${formatBaht(Number(value))} บาท`}
+                      labelFormatter={(v) => `อายุ ${v}`}
+                      contentStyle={{
+                        background: "var(--popover)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        color: "var(--popover-foreground)",
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      yAxisId="flow"
+                      type="monotone"
+                      dataKey="income"
+                      name="รายได้ (รวมต่อปี)"
+                      stroke="var(--chart-2)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      yAxisId="flow"
+                      type="monotone"
+                      dataKey="expense"
+                      name="รายจ่าย (รวมต่อปี)"
+                      stroke="var(--chart-4)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      yAxisId="asset"
+                      type="monotone"
+                      dataKey="asset"
+                      name="สินทรัพย์"
+                      stroke="var(--chart-1)"
+                      strokeWidth={2.5}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
